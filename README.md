@@ -1,4 +1,4 @@
-# nidaqAio 
+# nidaqmxAio 
 
 Input/output acquisition automation using the [nidaqmx](https://github.com/ni/nidaqmx-python) python API and analog input/output modules.
 
