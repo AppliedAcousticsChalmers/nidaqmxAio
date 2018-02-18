@@ -9,11 +9,38 @@ Python prerequisites: numpy, matplotlib, collections, colorednoise, nidaqmx.
 
 ### Usage
 
-Run `python run_meas.py <simulation time> <sample rate>` with additional arguements for channel input/outputs. 
+Run `python run_meas.py <simulation time> <sample rate>` with additional arguments for channel input/outputs. 
 
 The script is built without external triggering/clocking devices in mind. Due to system delays that cannot be deterministically calculated, the test signals are zero padded to avoid truncated ends. Type `python run_meas.py --help` for information on the additional arguments. 
 
-Inputs and outputs are used serially. To define them correctly, define the ins/outs for each module in a list, starting from the first on the chassis module. For example, if 2 inputs are needed from the module in slot 2 and 1 output from the module in slot 4, run the script as `python run_meas.py <simulation time in s> <sample rate> -ai 2 -ao 1`. In the case more modules are connected but not needed, include them using 0 ins/outs. For example if an additional input module is connected at slot 5, run  `python run_meas.py <simulation time in s> <sample rate> -ai 2 0 -ao 1`.
+#### Input arguments
+
+If you need to run the script with other than the default values, specify the corresponding arguments explicitly.
+
+`-tp <string>` or `--signalType <string>`:
+The type of the output signal to be generated. Currently, `white_noise` and `pink_noise` are supported (default: `pink_noise`)
+
+`-pad N` or `--pad_samples N`:
+Pad N samples at the end of the signal to avoid input truncation due to system delays (default `5000`)
+
+`-ai X Y ...` or `--channelsIn X Y ...`:
+Set the number of analog input channels per module. Begin from the lowest numbered slot and continue. The number of input channels per module are chosen serially. For example, if the argument is set as `-ai 2 4 0`, the first 2 input channels are used from the module connected at the lowest numbered slot on the chassis, the 4 from the second and none from the third. The number of channels and modules set here should match your physical setup (default: `0`)
+
+
+`-ao X Y ...` or `--channelsOut X Y ...`:
+Set the number of analog output channels per module. Begin from the lowest numbered slot and continue. The number of output channels per module are chosen serially. For example, if the argument is set as `-ao 2 4 0`, the first 2 output channels are used from the module connected at the lowest numbered slot on the chassis, the 4 from the second and none from the third. The number of channels and modules set here should match your physical setup (default: `0`)
+
+`-airms N` or `--aiRange N`:
+The analog input expected peak to peak range in rms volts (default: `3`)
+
+`-aorms N` or `--aoRange N`:
+The analog output expected peak to peak range in rms volts (default: `3`)
+
+`-sv True/False` or `--save_file True/False`:
+Choose to save the collected data. You will be asked to provide the desired filename after the measurement (default: `False`)
+
+`-bf N` or `--bufferSize N`:
+Buffer size in samples of the input channels (default: `2048`)
 
 ### TODO
 The acquisition algorithm works as is, but further post processing methods are needed to get meaningful results.
