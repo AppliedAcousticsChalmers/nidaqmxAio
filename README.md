@@ -5,7 +5,7 @@ Input/output acquisition automation using the [nidaqmx](https://github.com/ni/ni
 ### Prerequisites
 
 You need to be able to run python scripts on your system with version >3.6 installed. nidaqmx supports only Windows OS.
-Python prerequisites: numpy, matplotlib, collections, colorednoise, nidaqmx.
+Python prerequisites: numpy, matplotlib, collections, colorednoise, time, nidaqmx.
 
 ### Usage
 
