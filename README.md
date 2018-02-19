@@ -28,7 +28,7 @@ Set the number of analog input channels per module. Begin from the lowest number
 
 
 `-ao X Y ...` or `--channelsOut X Y ...`:
-Set the number of analog output channels per module. Begin from the lowest numbered slot and continue. The number of output channels per module are chosen serially. For example, if the argument is set as `-ao 2 4 0`, the first 2 output channels are used from the module connected at the lowest numbered slot on the chassis, the 4 from the second and none from the third. The number of channels and modules set here should match your physical setup (default: `0`)
+Set the number of analog output channels per module. Begin from the lowest numbered slot and continue. The number of output channels per module are chosen serially. For example, if the argument is set as `-ao 2 4 0`, the first 2 output channels are used from the module connected at the lowest numbered slot on the chassis, the 4 from the second and none from the third. The number of channels and modules set here should match your physical setup. Note that the test signal is copied to each analog output channel. This is due to change and be configurable by the user in future updates (default: `0`)
 
 `-airms N` or `--aiRange N`:
 The analog input expected peak to peak range in rms volts (default: `3`)
