@@ -1,0 +1,9 @@
+#Python libraries
+
+ argparse
+ numpy
+ scipy
+ colorednoise
+ pyqtgraph
+ tqdm
+ nidaqmx
