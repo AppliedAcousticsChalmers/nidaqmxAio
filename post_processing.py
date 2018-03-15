@@ -1,5 +1,8 @@
 #Python libraries
-import matplotlib.pyplot as plt
+from plotly import tools
+import plotly.offline as py
+import plotly.graph_objs as go
+# import matplotlib.pyplot as plt
 import numpy as np
 import math
 from scipy import signal, array
@@ -20,7 +23,7 @@ def mic_calibration(measurements, sensitivity):
     return calibration
 
 def h1_estimator_live(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, refCH):
-    # current_buffer = (np.array(current_buffer))# / calibrationData[1] * calibrationData[0]) / micAmp
+    current_buffer = ((np.array(current_buffer) / calibrationData[1]) * calibrationData[0]) / micAmp
     # previous_buffer = np.array(previous_buffer)
     blockSize = int(len(current_buffer[0]))
     nCHin = int(len(current_buffer))
@@ -75,7 +78,7 @@ def h1_estimator(filename, blockSize, calibrationData):
 
     #Reading the configuration
     print("Importing raw data... ", end="")
-    inputfile = np.load(filename + ".npy")
+    inputfile = np.load(filename)
     measurements = inputfile.item()
     measuredFRFs = measurements
     simTime = measurements["simulationTime"]
@@ -98,17 +101,19 @@ def h1_estimator(filename, blockSize, calibrationData):
     print("Completed")
 
     # Removing the zero padding of the signal
-    print("Removing the zero padding of the signal (This will take a while)... ", end="")
-    convxymin = np.convolve((data[int(refCH[0]), ...]), np.flipud(signalUnpadded), 'valid')
-    convxymax = np.convolve(np.flipud(data[int(refCH[0]), ...]), signalUnpadded, 'valid')
+    if simTime < 5:
+        print("Removing the zero padding of the signal (This will take a while)... ", end="")
+        convxymin = np.convolve((data[int(refCH[0]), ...]), np.flipud(signalUnpadded), 'valid')
+        convxymax = np.convolve(np.flipud(data[int(refCH[0]), ...]), signalUnpadded, 'valid')
 
-    pad_start = np.argmax(convxymin)
-    pad_end = np.argmax(convxymax)
-    print(calibrationData)
-    data = (data[..., pad_start:-pad_end] / calibrationData[1] * calibrationData[0]) / micAmp
+        pad_start = np.argmax(convxymin)
+        pad_end = np.argmax(convxymax)
+        data = (data[..., pad_start:-pad_end] / calibrationData[1] * calibrationData[0]) / micAmp
+        print("Completed")
+    else:
+        data = (data / calibrationData[1] * calibrationData[0]) / micAmp
+
     numberOfsamples = int(len(data[0]))
-    print("Completed")
-
     #Spectra calculations
     print("Calculating the spectra... ", end="")
     zeropad = blockSize - numberOfsamples % blockSize
@@ -195,29 +200,78 @@ def h1_estimator(filename, blockSize, calibrationData):
     print("Completed")
 
     #Plotting
-    for pltidx in range(len(H)):
+    # for pltidx in range(len(H)):
+    #     if pltidx == refCH[0]: continue
+    #     fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
+
+    #     ax1.semilogx(fftfreq[:-1], HdB[refCH[0],pltidx,...])
+    #     ax1.set_xlabel("frequency in Hz")
+
+    #     ax2.semilogx(fftfreq[:-1], gamma2[refCH[0],pltidx,...]) 
+    #     # ax2.semilogx(fftfreq[:-1], SNR[refCH[0],pltidx,...])
+    #     ax2.set_ylabel(r"$\gamma^2_{[%i,%i]},$"%(refCH[0],pltidx))
+    #     ax2.set_xlabel("frequency in Hz")
+
+    #     ax3.plot(tVec,IR.real[refCH[0],pltidx,...])
+    #     ax3.set_ylabel(r"$IR_{[%i,%i]}$"%(refCH[0],pltidx))
+    #     ax3.set_xlabel("time is s")
+
+    #     ax4.plot(fftfreq[:-1],H_phase[refCH[0],pltidx,...])
+    #     ax4.set_ylabel(r"$phase_{[%i,%i]}$"%(refCH[0],pltidx))
+    #     ax4.set_xlabel("frequency in Hz")
+    #     plt.show(block=False)
+
+    # plt.show(block=True)
+    for pltidx in range(nCHin):
         if pltidx == refCH[0]: continue
-        fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
+        plot1y = HdB[refCH[0],pltidx,:]
+        plot2y = gamma2[refCH[0],pltidx,:]
+        plot3y = IR.real[refCH[0],pltidx,:]
+        plot4y = H_phase[refCH[0],pltidx,:]
+        name1 = '$d, r \\text{ (solar radious)}$'
+        freqs = fftfreq[:-1]
+        tvec = tVec
 
-        ax1.semilogx(fftfreq[:-1], HdB[refCH[0],pltidx,...])
-        ax1.set_ylabel(r"$H1_{[%i,%i]}$ in dB"%(refCH[0],pltidx))
-        ax1.set_xlabel("frequency in Hz")
+    #     ax1.set_ylabel(r"$H1_{[%i,%i]}$ in dB"%(refCH[0],pltidx))
+        trace1 = go.Scatter(
+            x=freqs,
+            y=plot1y,
+            name='$H_{[%i,%i]}$ in dB'%(refCH[0],pltidx)
+        )
 
-        ax2.semilogx(fftfreq[:-1], gamma2[refCH[0],pltidx,...]) 
-        # ax2.semilogx(fftfreq[:-1], SNR[refCH[0],pltidx,...])
-        ax2.set_ylabel(r"$\gamma^2_{[%i,%i]},$"%(refCH[0],pltidx))
-        ax2.set_xlabel("frequency in Hz")
+        trace2 = go.Scatter(
+            x=freqs,
+            y=plot2y,
+            name='$\\gamma^2_{[%i,%i]}$'%(refCH[0],pltidx)
+        )
 
-        ax3.plot(tVec,IR.real[refCH[0],pltidx,...])
-        ax3.set_ylabel(r"$IR_{[%i,%i]}$"%(refCH[0],pltidx))
-        ax3.set_xlabel("time is s")
+        trace3 = go.Scatter(
+            x=tvec,
+            y=plot3y,
+            # name='$\\text{IR}_{[%i,%i]}$'%(refCH[0],pltidx)
+            name=name1
+        )
 
-        ax4.plot(fftfreq[:-1],H_phase[refCH[0],pltidx,...])
-        ax4.set_ylabel(r"$phase_{[%i,%i]}$"%(refCH[0],pltidx))
-        ax4.set_xlabel("frequency in Hz")
-        plt.show(block=False)
+        trace4 = go.Scatter(
+            x=freqs,
+            y=plot4y,
+            name='$Phase_{H,[%i,%i]}$'%(refCH[0],pltidx)
+        )
 
-    plt.show(block=True)
+        fig = tools.make_subplots(rows=2, cols=2, subplot_titles=('HdB', 'gamma2', 'IR', 'H_phase'))
+
+        fig.append_trace(trace1, 1, 1)
+        fig.append_trace(trace2, 1, 2)
+        fig.append_trace(trace3, 2, 1)
+        fig.append_trace(trace4, 2, 2)
+
+        fig['layout'].update(title=filename,
+                             xaxis1=dict(title='frequency in Hz', type='log', autorange=True),
+                             xaxis2=dict(title='frequency in Hz', type='log', autorange=True),
+                             xaxis3=dict(title='time in s', type='lin', autorange=True),
+                             xaxis4=dict(title='frequency in Hz', type='log', autorange=True)
+        )
+        py.plot(fig, filename=filename +'.html')
     print("Process Finished")
 
 

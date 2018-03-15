@@ -3,6 +3,7 @@ from numpy import pi, polymul
 from scipy import array, signal
 from collections.abc import Mapping
 import time
+import os, errno
 # from scipy.interpolate import interp1d
 import warnings
 
@@ -416,3 +417,12 @@ def saveToMat(obj):
     # obj = obj.item()
     mat = rec_key_replace(obj)
     return mat
+
+def create_dir(directory):
+    try:
+        os.makedirs(directory)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
+    return

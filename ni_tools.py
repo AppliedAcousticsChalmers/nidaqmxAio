@@ -1,7 +1,6 @@
 #Python libraries
-# import matplotlib
-# import matplotlib.pyplot as plt
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtGui, QtCore
+import sys
 import pyqtgraph as pg
 import numpy as np
 import time
@@ -21,14 +20,15 @@ system = nidaqmx.system.System.local()
 
 
 #Data acquisition script
-def ni_io_tf(args):
+def ni_io_tf(args, calibrationData=[1,1]):
     #Getting the initial arguments
     sim_time = args.time
     sample_rate = args.sampleRate
+    #Setting the sampling frequency to be an even number, so the Niquist frequency is at the last bin of each block
     if sample_rate % 2 !=0:
         sample_rate -= sample_rate % 2
         sample_rate = int(sample_rate)
-    bufferSize = int(sample_rate // 2)
+    bufferSize = args.bufferSize
     signal_temp = sig.create_signal(args.sampleRate, args.time, args.pad_samples, args.signalType, args.aoRange)
     signal = signal_temp[0]
     signal_unpadded = signal_temp[1]
@@ -36,16 +36,15 @@ def ni_io_tf(args):
     number_of_channels_out = args.channelsOut
     ai_range = args.aiRange
     ao_range = args.aoRange
-    calibrationData = args.calData
     number_of_samples = sim_time*sample_rate + args.pad_samples
+    #Recalculating the number of samples so they are an int multiple of the buffer size
     number_of_samples += bufferSize - (number_of_samples%bufferSize)
     if not np.sum(number_of_channels_out)<= 1: signal = np.tile(signal, [np.sum(number_of_channels_out), 1])
-    micAmp = input("Please specify the mic preamplification (eg: 1, 10, 100, default = 1)")
+    micAmp = args.micAmplification
     if not micAmp: micAmp = 1
     else: micAmp = int(micAmp)
     #Creating the dictionary to store the data
-    measurements = {'simulationTime': sim_time, 'SampleRate': sample_rate, 'Signal': args.signalType, 'Input_range_in_Vrms': ai_range, 'Output_range_in_Vrms': ao_range, 'micAmp': micAmp, 'Unpadded_signal': signal_unpadded, 'Reference_channel':[]}
-    measuredFRFs = measurements
+    measurements = {'simulationTime': sim_time, 'SampleRate': sample_rate, 'Signal': args.signalType, 'Input_range_in_Vrms': ai_range, 'Output_range_in_Vrms': ao_range, 'bufferSize':bufferSize, 'micAmp': micAmp, 'Unpadded_signal': signal_unpadded, 'Reference_channel':[]}
 
     #Reading the pressent in/out channels
     channel_list = []
@@ -107,7 +106,7 @@ def ni_io_tf(args):
         #Starting the data aquition/reproduction
 
         #Intialization
-        tVec = np.linspace(0, int(bufferSize / sample_rate), int(bufferSize))
+        tVec = np.linspace(0, bufferSize / sample_rate, bufferSize)
         fftfreq = np.fft.rfftfreq(bufferSize, 1 / sample_rate)
         timeCounter = 0
         blockidx = 0
@@ -118,10 +117,9 @@ def ni_io_tf(args):
         previous_buffer = np.zeros((sum(number_of_channels_in),int(bufferSize)))
 
         #Figure creation
-        from pyqtgraph.Qt import QtGui
+        global app
         app = QtGui.QApplication([])
-        import pyqtgraph as pg
-
+        global win
         win = pg.GraphicsLayoutWidget()
         win.setWindowTitle('And awaaaaay we go!')
         win.resize(1000, 600)
@@ -186,9 +184,12 @@ def ni_io_tf(args):
             pbar_ai = tqdm(total=number_of_samples)
             # if number_of_channels_in[0] >= 2:
             while timeCounter < number_of_samples:
+                #The current read buffer
                 current_buffer = read_task.read(number_of_samples_per_channel=bufferSize)
                 current_buffer = np.array(current_buffer)
+                #This is the variable that stores the data for saving
                 values_read[:,timeCounter:timeCounter+bufferSize] =  current_buffer
+                #Calculations needed depending on the channel
                 if number_of_channels_in[0] >= 2:
                     previous_buffer, spectra, blockidx, H, HdB, H_phase, IR, gamma2  = pp.h1_estimator_live(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, selection)
                 else:spectra = np.array(current_buffer)
@@ -213,7 +214,6 @@ def ni_io_tf(args):
             for pbar_ao_idx in range(pbar_ao):
                 pbar_ao.update()
             pbar_ao.close()
-
     #Updating the dictionary with the measured data
     ch_count = 0
     for idx, device_idx in enumerate(idx_ai):
@@ -222,7 +222,6 @@ def ni_io_tf(args):
             measurements.update({(channel_list[device_idx]['ai'][ch_num]):np.array(values_read)[ch_count, ...]})
             ch_count += 1
 
-    if number_of_channels_in[0] >= 2: measuredFRFs.update({"Hij":H, "HdBij":HdB, "H_phase_ij": H_phase, "IRij":IR, "gamma2ij":gamma2, "fftfreq":fftfreq, "tVec":tVec})
-
+    if number_of_channels_in[0] >= 2: measurements.update({"Hij":H, "HdBij":HdB, "H_phase_ij": H_phase, "IRij":IR, "gamma2ij":gamma2, "fftfreq":fftfreq, "tVec":tVec})
 
     return measurements
