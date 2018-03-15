@@ -11,7 +11,7 @@ Python prerequisites found in `requirements.txt`. To install them, run `pip inst
 
 Run `python run_meas.py <simulation time> <sample rate>` with additional arguments for channel input/outputs. 
 
-The script is built without external triggering/clocking devices in mind. Due to system delays that cannot be deterministically calculated, the test signals are zero padded to avoid truncated ends. Type `python run_meas.py --help` for information on the additional arguments. Measurements are saved in the directory `acquired_data` in the format `meas_<YYMMDD>.py` if `-sv True`, or `-pp <=!no>` is set. You will be asked for a microphone pre-amplification factor whick defaults to `1` if left blank. During measurements, a live post-processing preview is displayed, presenting the spectra of reference and measured channel, transfer function (using the H1 estimator), impulse response and coherence. The reference channel can be selected from a list after running the script (leave blank to select the first channel on the list).
+The script is built without external triggering/clocking devices in mind. Due to system delays that cannot be deterministically calculated, the test signals are zero padded to avoid truncated ends. Type `python run_meas.py --help` for information on the additional arguments. Measurements are saved in the directory `acquired_data\measurements_<YYMMDD>\` in the format `meas_<YYMMDD>.py` by specifying the desired filename, using `-sv filename`. During measurements, a live post-processing preview is displayed, presenting the spectra of reference and measured channel, transfer function (using the H1 estimator), impulse response and coherence. The reference channel can be selected from a list after running the script (leave blank to select the first channel on the list).
 
 #### Input arguments
 
@@ -35,22 +35,20 @@ The analog input absolute peak expected in volts (default: `5.0`)
 `-aop <float>` or `--aoPeak <float>`:
 The analog output absolute peak expected in volts (default: `1.0`)
 
-`-sv <bool>` or `--save_file <bool>`:
-Choose to save the collected data. You will be asked to provide the desired filename after the measurement. Leave blank for the default name `meas_` (default: `False`)
+`-sv <string>` or `--save_file <string>`:
+If specified the collected data are saved, in the given filename.  (default: `no`)
 
 `-bf <int>` or `--bufferSize <int>`:
-Buffer size in samples of the input channels (default: `2048`)
+Buffer size in samples of the input channels. This is used also as the time window for the analysis done at the live post-processing preview. (default: `8192`)
 
-`-cal <bool>`or `--calibration <bool>`:
-Run the calibration measurement script and save the callibration coefficient and the microphone sensitivity in file. If not defined, the sensitivity used is for the microphone B&K type 4190. If defined, you will be asked to set a filename for the calibration (leave blank for the default name `calibration_cal`)
+`-cal <string>`or `--calibration <string>`:
+If set as `new`, the calibration measurement script is run and the calibration coefficient and microphone sensitivity are saved. You will be asked to specify the name of the saved file (leave blank for the default name `calibration_cal`) and the microphone sensitivity. If not defined, the sensitivity used is for the microphone B&K type 4190.
 
 `-pp <string>` or `--postProcess <string>`:
-Run the chosen post processing script directly after measuring is completed. You will be asked for the calibration filename and block size for the analysis. Results will be saved as `<measurement_name>_TFs`. Current choices:
+Run the chosen post processing script. You will be asked to select the directory and a the file from a list, as well as the block size for the analysis (not selecting a file will cause the script to run for all the files in the selected directory with the file extension`.np[yz]`, except the calibration files). Results will be saved as `<measurement_name>_TFs`. Current choices:
 `no` - don't run post process scripts
 `TF` - run transfer function process script using the H1 estimator (default: `no`)
 
-`-opp <string>` or `onlyPostProcess <string>`
-Same as above, without taking new measurement.
 
 ### TODO
 The acquisition algorithm works as is, but further post processing methods are needed to get results other than a transfer function.
@@ -59,4 +57,4 @@ The acquisition algorithm works as is, but further post processing methods are n
 * reduction index (on- and off-line)
 * FIX: live preview displays up to 2 input channels. More channels should be able to be displayed meaningfully.
 * move CLI input arguments to a settings file
-* automatically create data folder
+* fix plotly compatibility with LaTeX interpreter 

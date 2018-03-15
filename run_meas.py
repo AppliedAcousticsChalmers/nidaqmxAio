@@ -77,9 +77,9 @@ if __name__ == '__main__':
     for a in args.__dict__:
         print(str(a) + ": " + str(args.__dict__[a]))
     #Creating the directories for saving the data if it does not exist
-    directory = "aquired_data\\"
-    meas_directory = "aquired_data\\measurement_"
-    Caldirectory = "aquired_data\\calibration_files"
+    directory = "acquired_data\\"
+    meas_directory = "acquired_data\\measurement_"
+    Caldirectory = "acquired_data\\calibration_files"
     currentDTime = ti.strftime('%y%m%d-%H%M')
     currentDay = ti.strftime('%y%m%d')
     gz.create_dir(directory)
@@ -110,7 +110,7 @@ if __name__ == '__main__':
         print("\nPlease select a directory")
         idx = 0
         dir_names = []
-        for name in os.listdir(path="aquired_data"):
+        for name in os.listdir(path="acquired_data"):
             if os.path.isdir(directory + name):
                 dir_names.append(name)
                 print("[" + str(idx) + "]" + name)
