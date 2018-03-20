@@ -1,9 +1,9 @@
 #Python libraries
 
- argparse
- numpy
- scipy
- colorednoise
- pyqtgraph
- tqdm
- nidaqmx
+argparse
+numpy
+scipy
+colorednoise
+pyqtgraph	
+tqdm
+nidaqmx

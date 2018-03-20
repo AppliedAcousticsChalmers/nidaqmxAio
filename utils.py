@@ -1,6 +1,7 @@
 import numpy as np
 from numpy import pi, polymul
-from scipy import array, signal
+from scipy import array, signal 
+from scipy.signal import butter, lfilter, filtfilt
 from collections.abc import Mapping
 import time
 import os, errno
@@ -408,21 +409,16 @@ def narrow2third(xdb, fnarrow):
     return bands, fc_pref
 
 
-def rec_key_replace(obj):
-    if isinstance(obj, Mapping):
-        return {key.replace('/', '_'): rec_key_replace(val) for key, val in obj.items()}
-    return obj
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
 
-def saveToMat(obj):
-    # obj = obj.item()
-    mat = rec_key_replace(obj)
-    return mat
 
-def create_dir(directory):
-    try:
-        os.makedirs(directory)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-
-    return
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    # y = filtfilt(b, a, data)
+    return y

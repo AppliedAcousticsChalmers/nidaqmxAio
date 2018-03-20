@@ -39,13 +39,13 @@ The analog output absolute peak expected in volts (default: `1.0`)
 If specified the collected data are saved, in the given filename.  (default: `no`)
 
 `-bf <int>` or `--bufferSize <int>`:
-Buffer size in samples of the input channels. This is used also as the time window for the analysis done at the live post-processing preview. (default: `8192`)
+Buffer size in samples of the input channels. This is used also as the time window for the analysis done at both the live post-processing preview and the Transfer function post-processing script. (default: `8192`)
 
 `-cal <string>`or `--calibration <string>`:
 If set as `new`, the calibration measurement script is run and the calibration coefficient and microphone sensitivity are saved. You will be asked to specify the name of the saved file (leave blank for the default name `calibration_cal`) and the microphone sensitivity. If not defined, the sensitivity used is for the microphone B&K type 4190.
 
 `-pp <string>` or `--postProcess <string>`:
-Run the chosen post processing script. You will be asked to select the directory and a the file from a list, as well as the block size for the analysis (not selecting a file will cause the script to run for all the files in the selected directory with the file extension`.np[yz]`, except the calibration files). Results will be saved as `<measurement_name>_TFs`. Current choices:
+Run the chosen post processing script. You will be asked to select the directory and a the file from a list (not selecting a file will cause the script to run for all the files in the selected directory with the file extension`.np[yz]`, except the calibration files). Results will be saved as `<measurement_name>_TFs`. Current choices:
 `no` - don't run post process scripts
 `TF` - run transfer function process script using the H1 estimator (default: `no`)
 

@@ -108,6 +108,7 @@ def ni_io_tf(args, calibrationData=[1,1]):
         #Intialization
         tVec = np.linspace(0, bufferSize / sample_rate, bufferSize)
         fftfreq = np.fft.rfftfreq(bufferSize, 1 / sample_rate)
+        fftfreq = fftfreq[:-1]
         timeCounter = 0
         blockidx = 0
         # previous_buffer = []
@@ -196,11 +197,11 @@ def ni_io_tf(args, calibrationData=[1,1]):
                     #Plotting
                 for i in range(0,numPlots,4):
                     if numPlots > 1:
-                        curve[i].setData(gz.amp2db(spectra[0,0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+1].setData(gz.amp2db(spectra[1,0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+2].setData(HdB[1,...], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+3].setData(IR.real[1,...], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+4].setData(gamma2[1,...], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i].setData(fftfreq, gz.amp2db(spectra[0,0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+1].setData(fftfreq, gz.amp2db(spectra[1,0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+2].setData(fftfreq, HdB[1,...], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+3].setData(tVec, IR.real[1,...], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+4].setData(fftfreq, gamma2[1,...], antialias=True, downsample=downsample, downsampleMethod='subsample')
                     else:
                         curve[i].setData(spectra, antialias=True, downsample=downsample, downsampleMethod='subsample')
                     pg.QtGui.QApplication.processEvents()

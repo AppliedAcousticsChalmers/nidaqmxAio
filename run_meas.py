@@ -9,6 +9,7 @@ import numpy as np
 import time as ti
 import scipy.io as sio
 #Program libraries
+import systemUtils as sy
 import ni_tools as ni
 import post_processing as pp
 import meas_signal as sig
@@ -33,7 +34,7 @@ def parseArguments():
     parser.add_argument("-bf", "--bufferSize", help="Input buffer size in samples", type=int)
     parser.add_argument("-cal", "--calibration", help="typing \"new\" runs a new calibration measurement, otherwise specify the calibration file", type=str)
     parser.add_argument("-micA", "--micAmplification", help="Specify the amplification factior of he microphone", type=float)
-    parser.add_argument("-pp", "--postProcess", help="Post proccessing type", type=str, choices={"no","TF"} )
+    parser.add_argument("-pp", "--postProcess", help="Post proccessing type", type=str, choices={"no","TF","T60"} )
     # Print version
     parser.add_argument("--version", action="version", version='%(prog)s - Version 0.4')
 
@@ -53,14 +54,14 @@ if __name__ == '__main__':
     if not args.aoRange: args.aoRange = 1
     if not args.save_file: args.save_file = "no"
     if not args.bufferSize: args.bufferSize = 8192
-    if not args.postProcess or args.calibration: args.postProcess = "no"
+    if not args.postProcess : args.postProcess = "no"
     if not args.micAmplification: args.micAmplification = 1
     if args.postProcess != "no": args.time == args.sampleRate == 0
     if not args.calibration: args.calibration = "no"
 
     #figure out the saved filename
     if args.save_file != "no": filename = args.save_file + "_"
-    elif args.calibration != "no": filename = args.calibration 
+    elif args.calibration != "no": filename = args.calibration
     else: filename = "measurement_"
 
     #Configuring the setup for the calibration measurement
@@ -77,13 +78,11 @@ if __name__ == '__main__':
     for a in args.__dict__:
         print(str(a) + ": " + str(args.__dict__[a]))
     #Creating the directories for saving the data if it does not exist
-    directory = "acquired_data\\"
+    directory = "acquired_data"
     meas_directory = "acquired_data\\measurement_"
     Caldirectory = "acquired_data\\calibration_files"
-    currentDTime = ti.strftime('%y%m%d-%H%M')
-    currentDay = ti.strftime('%y%m%d')
-    gz.create_dir(directory)
-    gz.create_dir(Caldirectory)
+    sy.create_dir(directory)
+    sy.create_dir(Caldirectory)
 
     #Calibration. New calibration measurement or loading the calibration data
     if args.calibration =="new":
@@ -107,76 +106,23 @@ if __name__ == '__main__':
     #Post processing
     if args.postProcess != "no":
         #Choosing the directory
-        print("\nPlease select a directory")
-        idx = 0
-        dir_names = []
-        for name in os.listdir(path="acquired_data"):
-            if os.path.isdir(directory + name):
-                dir_names.append(name)
-                print("[" + str(idx) + "]" + name)
-                idx += 1
-        selection = input()
-        if not selection: selection = 0
-        selected_directory = directory + dir_names[int(selection)]
-        #Create the directories if not pressent
-        TFdirectory = selected_directory + "\\TFs"
-        gz.create_dir(TFdirectory)
-        matTF_directory = selected_directory + "\\matLab\\TFs"
-        gz.create_dir(matTF_directory)
-
+        selected_diretory = sy.dir_select(directory)
+        print(selected_diretory)
         #File selection
-        print("\nPlease enter the name of the file with the raw data: ")
-        idx = 0
-        file_names = []
-        print(selected_directory)
-        for name in sorted(glob.glob(selected_directory + '/*.np[yz]')):
-                if "_Cal" in name: continue
-                file_names.append(name)
-                print("[" + str(idx) + "]" + name.rsplit('\\',1)[1].rsplit('.',1)[0])
-                idx += 1
-        selection = input()
+        filenames = sy.file_select(selected_diretory)
         #Setting up the initial parameters
-        blockSize = input("\nPlease enter desired blocksize for the analysis: ")
-        if not blockSize: blockSize = 8192
-        #If "all" is given processes all data in the specified directory
-        if not selection:
-            numpy_name = []
-            numpy_vars = {}
-            for filename in sorted(glob.glob(selected_directory + '/*.np[yz]')):
-                if "_Cal" in filename: continue
-                print("Processing file: " + filename)
-                processedData = pp.h1_estimator(filename,  blockSize, calibrationData)
-                #Saving the data
-                postFilename = TFdirectory + "\\" + filename.rsplit('\\',1)[1].rsplit('.',1)[0] + "TFs_" + currentDTime
-                matTF_postFilename = matTF_directory + "\\" + filename.rsplit('\\',1)[1].rsplit('.',1)[0] + "TFs_" + currentDTime
-                np.save(postFilename, processedData)
-                matsave = gz.saveToMat(processedData)
-                sio.savemat(matTF_postFilename,{"object": matsave})
-        else:
-            filename = file_names[int(selection)]
-            postFilename = filename
-            processedData = pp.h1_estimator(postFilename,  blockSize, calibrationData)
-            postFilename = TFdirectory + "\\" + filename.rsplit('\\',1)[1].rsplit('.',1)[0] + "TFs_" + currentDTime
-            matTF_postFilename = matTF_directory + "\\" + filename.rsplit('\\',1)[1].rsplit('.',1)[0] + "TFs_" + currentDTime
-            np.save(postFilename, processedData)
-            matsave = gz.saveToMat(processedData)
-            sio.savemat(matTF_postFilename,{"object": matsave})
+        for current_file in filenames:
+            print("Processing file: " + current_file)
+            if args.postProcess == "TF": processedData = pp.h1_estimator(current_file,  args.bufferSize, calibrationData)
+            #Saving the data
+            sy.file_save(processedData, current_file, selected_diretory, args.postProcess)
     else:
 
     #New measurement
         meas = ni.ni_io_tf(args, calibrationData)
-        # input("press enter")
         #Saving the new measurement
         if args.save_file!="no":
-            meas_directory += currentDay
-            gz.create_dir(meas_directory)
-            postFilename = meas_directory + "\\" + args.save_file + "_" + currentDTime
-            np.save(postFilename, meas)
-            matsave = gz.saveToMat(meas)
-            mat_directory = meas_directory + "\\matLab"
-            gz.create_dir(mat_directory)
-            mat_postFilename = mat_directory + "\\" + args.save_file + currentDTime
-            sio.savemat(mat_postFilename,{"object": matsave})
+            sy.file_save(meas, args.save_file, meas_directory)
 
     if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION'):
         pg.QtGui.QApplication.exec_()
