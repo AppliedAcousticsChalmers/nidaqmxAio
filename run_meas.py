@@ -1,19 +1,14 @@
-#Python libraries
+# Python libraries
 import argparse
-import glob
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import sys
-import os, errno
 import numpy as np
-import time as ti
-import scipy.io as sio
-#Program libraries
+# Program libraries
 import systemUtils as sy
 import ni_tools as ni
 import post_processing as pp
-import meas_signal as sig
-import utils as gz
+
 
 def parseArguments():
     # Create argument parser
@@ -43,9 +38,10 @@ def parseArguments():
 
     return args
 
+
 if __name__ == '__main__':
     args = parseArguments()
-    #Setting the default values for the input arguments
+    # Setting the default values for the input arguments
     if not args.signalType: args.signalType = "pink_noise"
     if not args.pad_samples: args.pad_samples = 5000
     if not args.channelsIn: args.channelsIn = [0]
@@ -59,12 +55,12 @@ if __name__ == '__main__':
     if args.postProcess != "no": args.time == args.sampleRate == 0
     if not args.calibration: args.calibration = "no"
 
-    #figure out the saved filename
+    # figure out the saved filename
     if args.save_file != "no": filename = args.save_file + "_"
     elif args.calibration != "no": filename = args.calibration
     else: filename = "measurement_"
 
-    #Configuring the setup for the calibration measurement
+    # Configuring the setup for the calibration measurement
     if args.calibration =="new":
         args.channelsIn = [1]
         args.channelsOut = [0]
@@ -73,19 +69,19 @@ if __name__ == '__main__':
         args.bufferSize = 8192
     if args.postProcess != "no": args.save_file = filename
 
-    #Printing the final arguements
+    # Printing the final arguements
     print("You are running the script with arguments: ")
     for a in args.__dict__:
         print(str(a) + ": " + str(args.__dict__[a]))
-    #Creating the directories for saving the data if it does not exist
+    # Creating the directories for saving the data if it does not exist
     directory = "acquired_data"
     meas_directory = "acquired_data\\measurement_"
     Caldirectory = "acquired_data\\calibration_files"
     sy.create_dir(directory)
     sy.create_dir(Caldirectory)
 
-    #Calibration. New calibration measurement or loading the calibration data
-    if args.calibration =="new":
+    # Calibration. New calibration measurement or loading the calibration data
+    if args.calibration == "new":
         cal_filename = input("Please enter the name for the calibration file:")
         if not cal_filename: cal_filename = filename
         cal_postFilename = Caldirectory + "\\" + cal_filename + "_Cal"
@@ -95,33 +91,32 @@ if __name__ == '__main__':
         calibrationData = pp.mic_calibration(meas, sensitivity)
         np.save(cal_postFilename, calibrationData)
         sys.exit()
-    elif args.calibration != "new" and args.calibration !="no":
+    elif args.calibration != "new" and args.calibration != "no":
         calFilename = Caldirectory + "\\" + args.calibration + "_Cal.npy"
         calibrationData = np.load(calFilename)
     else:
         print("No calibration data given.")
         calibrationData = [1, 1]
 
-
-    #Post processing
+    # Post processing
     if args.postProcess != "no":
-        #Choosing the directory
+        # Choosing the directory
         selected_diretory = sy.dir_select(directory)
         print(selected_diretory)
-        #File selection
+        # File selection
         filenames = sy.file_select(selected_diretory)
-        #Setting up the initial parameters
+        # Setting up the initial parameters
         for current_file in filenames:
             print("Processing file: " + current_file)
             if args.postProcess == "TF": processedData = pp.h1_estimator(current_file,  args.bufferSize, calibrationData)
-            #Saving the data
+            # Saving the data
             sy.file_save(processedData, current_file, selected_diretory, args.postProcess)
     else:
 
-    #New measurement
+        # New measurement
         meas = ni.ni_io_tf(args, calibrationData)
-        #Saving the new measurement
-        if args.save_file!="no":
+        # Saving the new measurement
+        if args.save_file != "no":
             sy.file_save(meas, args.save_file, meas_directory)
 
     if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION'):

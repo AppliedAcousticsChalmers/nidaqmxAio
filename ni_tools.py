@@ -1,16 +1,14 @@
-#Python libraries
-from pyqtgraph.Qt import QtGui, QtCore
-import sys
+# Python libraries
+from pyqtgraph.Qt import QtGui
 import pyqtgraph as pg
 import numpy as np
 import time
 from tqdm import tqdm
-#Program libraries
+# Program libraries
 import utils as gz
 import meas_signal as sig
 import post_processing as pp
-#nidaqmx libraries
-import collections
+# nidaqmx libraries
 import nidaqmx.system
 from nidaqmx.task import Task
 from nidaqmx.constants import AcquisitionType, TaskMode, Coupling
@@ -19,13 +17,13 @@ from nidaqmx.stream_readers import AnalogMultiChannelReader
 system = nidaqmx.system.System.local()
 
 
-#Data acquisition script
-def ni_io_tf(args, calibrationData=[1,1]):
-    #Getting the initial arguments
+# Data acquisition script
+def ni_io_tf(args, calibrationData=[1, 1]):
+    # Getting the initial arguments
     sim_time = args.time
     sample_rate = args.sampleRate
-    #Setting the sampling frequency to be an even number, so the Niquist frequency is at the last bin of each block
-    if sample_rate % 2 !=0:
+    # Setting the sampling frequency to be an even number, so the Niquist frequency is at the last bin of each block
+    if sample_rate % 2 != 0:
         sample_rate -= sample_rate % 2
         sample_rate = int(sample_rate)
     bufferSize = args.bufferSize
@@ -37,60 +35,60 @@ def ni_io_tf(args, calibrationData=[1,1]):
     ai_range = args.aiRange
     ao_range = args.aoRange
     number_of_samples = sim_time*sample_rate + args.pad_samples
-    #Recalculating the number of samples so they are an int multiple of the buffer size
-    number_of_samples += bufferSize - (number_of_samples%bufferSize)
-    if not np.sum(number_of_channels_out)<= 1: signal = np.tile(signal, [np.sum(number_of_channels_out), 1])
+    # Recalculating the number of samples so they are an int multiple of the buffer size
+    number_of_samples += bufferSize - (number_of_samples % bufferSize)
+    if not np.sum(number_of_channels_out) <= 1: signal = np.tile(signal, [np.sum(number_of_channels_out), 1])
     micAmp = args.micAmplification
     if not micAmp: micAmp = 1
     else: micAmp = int(micAmp)
-    #Creating the dictionary to store the data
+    # Creating the dictionary to store the data
     measurements = {'simulationTime': sim_time, 'SampleRate': sample_rate, 'Signal': args.signalType, 'Input_range_in_Vrms': ai_range, 'Output_range_in_Vrms': ao_range, 'bufferSize':bufferSize, 'micAmp': micAmp, 'Unpadded_signal': signal_unpadded, 'Reference_channel':[]}
 
-    #Reading the pressent in/out channels
+    # Reading the pressent in/out channels
     channel_list = []
     for device in system.devices:
-        channel_list.append({"ai":[channels_ai.name for _, channels_ai in enumerate(device.ai_physical_chans)],
-                            "ao":[channels_ao.name for _, channels_ao in enumerate(device.ao_physical_chans)]})
+        channel_list.append({"ai": [channels_ai.name for _, channels_ai in enumerate(device.ai_physical_chans)],
+                            "ao":  [channels_ao.name for _, channels_ao in enumerate(device.ao_physical_chans)]})
 
-    #Selecting the channels that were selected by the user
+    # channels selected by user
     idx_ai = []
     idx_ao = []
     if np.sum(number_of_channels_in) == 1:
         values_read = np.empty((0))
     else:
-        values_read = np.empty((np.sum(number_of_channels_in),0))
+        values_read = np.empty((np.sum(number_of_channels_in), 0))
     for idx in range(len(channel_list)):
-        if channel_list[idx]['ai']!=[] : idx_ai.append(idx)
-        if channel_list[idx]['ao']!=[] : idx_ao.append(idx)
+        if channel_list[idx]['ai'] != []: idx_ai.append(idx)
+        if channel_list[idx]['ao'] != []: idx_ao.append(idx)
     idx_ai = idx_ai[:len(number_of_channels_in)]
-    if sum(number_of_channels_in)==0: idx_ai=[]
+    if sum(number_of_channels_in) == 0: idx_ai = []
     idx_ao = idx_ao[:len(number_of_channels_out)]
-    if sum(number_of_channels_out)==0: idx_ao=[]
+    if sum(number_of_channels_out) == 0: idx_ao = []
 
-    # Selecting the input channel that is going to be used as reference
+    # reference input channel
     ch_count = 0
     chSelect = []
     print("Please select which channel should be used as reference in post processing. (pressing enter will default to the first channel in the list)")
     for idx, device_idx in enumerate(idx_ai):
-        if number_of_channels_in[idx] == 0 or idx_ai==[] : continue
+        if number_of_channels_in[idx] == 0 or idx_ai == []: continue
         for ch_num in range(number_of_channels_in[idx]):
             chSelect.append(channel_list[device_idx]['ai'][ch_num])
-            print("[" + str(ch_count)+ "]"+" "+chSelect[ch_count])
+            print("[" + str(ch_count) + "]"+" "+chSelect[ch_count])
             ch_count += 1
     selection = input()
     if selection: selection = int(selection); refChannel = chSelect[selection]
     else: refChannel = chSelect[0]; selection = 0
     measurements.update({'Reference_channel':refChannel})
 
-    #Setting up the in/out task
+    # Setting up the in/out task
     Coupling.AC
     with nidaqmx.Task() as write_task, nidaqmx.Task() as read_task:
         for idx, device_idx in enumerate(idx_ao):
-            if number_of_channels_out[idx] == 0 or idx_ao==[] : continue
+            if number_of_channels_out[idx] == 0 or idx_ao == [] : continue
             write_task.ao_channels.add_ao_voltage_chan(channel_list[device_idx]['ao'][0]+":%i"%(number_of_channels_out[idx]-1), max_val=ao_range, min_val=-ao_range)
 
         for idx, device_idx in enumerate(idx_ai):
-            if number_of_channels_in[idx] == 0 or idx_ai==[] : continue
+            if number_of_channels_in[idx] == 0 or idx_ai == []: continue
             read_task.ai_channels.add_ai_voltage_chan(channel_list[device_idx]['ai'][0]+":%i"%(number_of_channels_in[idx]-1), max_val=ai_range, min_val=-ai_range)
         if idx_ai != []:
             read_task.timing.cfg_samp_clk_timing(rate=sample_rate, sample_mode = AcquisitionType.CONTINUOUS)
@@ -103,9 +101,9 @@ def ni_io_tf(args, calibrationData=[1,1]):
         if idx_ao: write_task.start()
         if idx_ai: read_task.start()
 
-        #Starting the data aquition/reproduction
+        # Starting the data aquition/reproduction
 
-        #Intialization
+        # Intialization
         tVec = np.linspace(0, bufferSize / sample_rate, bufferSize)
         fftfreq = np.fft.rfftfreq(bufferSize, 1 / sample_rate)
         fftfreq = fftfreq[:-1]
@@ -113,11 +111,11 @@ def ni_io_tf(args, calibrationData=[1,1]):
         blockidx = 0
         # previous_buffer = []
         # current_buffer = []
-        values_read = np.zeros((sum(number_of_channels_in),int(number_of_samples)))
-        current_buffer = np.zeros((sum(number_of_channels_in),int(bufferSize)))
-        previous_buffer = np.zeros((sum(number_of_channels_in),int(bufferSize)))
+        values_read = np.zeros((sum(number_of_channels_in), int(number_of_samples)))
+        current_buffer = np.zeros((sum(number_of_channels_in), int(bufferSize)))
+        previous_buffer = np.zeros((sum(number_of_channels_in), int(bufferSize)))
 
-        #Figure creation
+        # Figure creation
         global app
         app = QtGui.QApplication([])
         global win
@@ -137,7 +135,7 @@ def ni_io_tf(args, calibrationData=[1,1]):
             numPlots = 4
             plotsPerRow = 2
         else:
-            numPlots =  sum(number_of_channels_in ) * 4
+            numPlots = sum(number_of_channels_in ) * 4
             plotsPerRow = 4
         downsample = numPlots*0+1
         for i in range(numPlots):
@@ -180,21 +178,21 @@ def ni_io_tf(args, calibrationData=[1,1]):
                 win.nextRow()
                 plotCounter = 0
 
-        #Main loop
+        # Main loop
         if idx_ai:
             pbar_ai = tqdm(total=number_of_samples)
             # if number_of_channels_in[0] >= 2:
             while timeCounter < number_of_samples:
-                #The current read buffer
+                # The current read buffer
                 current_buffer = read_task.read(number_of_samples_per_channel=bufferSize)
                 current_buffer = np.array(current_buffer)
-                #This is the variable that stores the data for saving
+                # This is the variable that stores the data for saving
                 values_read[:,timeCounter:timeCounter+bufferSize] =  current_buffer
-                #Calculations needed depending on the channel
+                # Calculations needed depending on the channel
                 if number_of_channels_in[0] >= 2:
                     previous_buffer, spectra, blockidx, H, HdB, H_phase, IR, gamma2  = pp.h1_estimator_live(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, selection)
                 else:spectra = np.array(current_buffer)
-                    #Plotting
+                    # Plotting
                 for i in range(0,numPlots,4):
                     if numPlots > 1:
                         curve[i].setData(fftfreq, gz.amp2db(spectra[0,0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
@@ -215,7 +213,7 @@ def ni_io_tf(args, calibrationData=[1,1]):
             for pbar_ao_idx in range(pbar_ao):
                 pbar_ao.update()
             pbar_ao.close()
-    #Updating the dictionary with the measured data
+    # Updating the dictionary with the measured data
     ch_count = 0
     for idx, device_idx in enumerate(idx_ai):
         if number_of_channels_in[idx] == 0 or idx_ai==[] : continue
