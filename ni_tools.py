@@ -10,6 +10,7 @@ import meas_signal as sig
 import post_processing as pp
 # nidaqmx libraries
 import nidaqmx.system
+import nidaqmx
 from nidaqmx.task import Task
 from nidaqmx.constants import AcquisitionType, TaskMode, Coupling
 from nidaqmx.stream_writers import AnalogMultiChannelWriter
@@ -66,19 +67,20 @@ def ni_io_tf(args, calibrationData=[1, 1]):
     if sum(number_of_channels_out) == 0: idx_ao = []
 
     # reference input channel
-    ch_count = 0
-    chSelect = []
-    print("Please select which channel should be used as reference in post processing. (pressing enter will default to the first channel in the list)")
-    for idx, device_idx in enumerate(idx_ai):
-        if number_of_channels_in[idx] == 0 or idx_ai == []: continue
-        for ch_num in range(number_of_channels_in[idx]):
-            chSelect.append(channel_list[device_idx]['ai'][ch_num])
-            print("[" + str(ch_count) + "]"+" "+chSelect[ch_count])
-            ch_count += 1
-    selection = input()
-    if selection: selection = int(selection); refChannel = chSelect[selection]
-    else: refChannel = chSelect[0]; selection = 0
-    measurements.update({'Reference_channel':refChannel})
+    if idx_ai != []:
+        ch_count = 0
+        chSelect = []
+        print("Please select which channel should be used as reference in post processing. (pressing enter will default to the first channel in the list)")
+        for idx, device_idx in enumerate(idx_ai):
+            if number_of_channels_in[idx] == 0 or idx_ai == []: continue
+            for ch_num in range(number_of_channels_in[idx]):
+                chSelect.append(channel_list[device_idx]['ai'][ch_num])
+                print("[" + str(ch_count) + "]"+" "+chSelect[ch_count])
+                ch_count += 1
+        selection = input()
+        if selection: selection = int(selection); refChannel = chSelect[selection]
+        else: refChannel = chSelect[0]; selection = 0
+        measurements.update({'Reference_channel':refChannel})
 
     # Setting up the in/out task
     Coupling.AC
@@ -94,6 +96,7 @@ def ni_io_tf(args, calibrationData=[1, 1]):
             read_task.timing.cfg_samp_clk_timing(rate=sample_rate, sample_mode = AcquisitionType.CONTINUOUS)
 
         if idx_ao != []:
+            write_task.out_stream.regen_mode = nidaqmx.constants.RegenerationMode.DONT_ALLOW_REGENERATION
             write_task.timing.cfg_samp_clk_timing(rate=sample_rate, sample_mode = AcquisitionType.CONTINUOUS)
             write_task.write(signal)
         if idx_ao: write_task.control(TaskMode.TASK_COMMIT)
@@ -209,10 +212,6 @@ def ni_io_tf(args, calibrationData=[1, 1]):
             pbar_ai.close()
         elif idx_ao:
             time.sleep(sim_time)
-            pbar_ao = tqdm(total=sim_time)
-            for pbar_ao_idx in range(pbar_ao):
-                pbar_ao.update()
-            pbar_ao.close()
     # Updating the dictionary with the measured data
     ch_count = 0
     for idx, device_idx in enumerate(idx_ai):
