@@ -70,7 +70,7 @@ def file_select(directory):
         else: return [file_names[int(selection)]]
 
 
-def file_save(data, filename, directory, extention=[]):
+def file_save(data, filename, directory, extention=[], options=[]):
     currentDTime = ti.strftime('%y%m%d-%H%M')
     currentDay = ti.strftime('%y%m%d')
     # For the new measurement
@@ -81,11 +81,15 @@ def file_save(data, filename, directory, extention=[]):
         # Filename creation for the current meassurement
         postFilename = directory + "\\" + filename + "_" + currentDTime
         np.save(postFilename, data)
+        # save configuration options
+        f = open(postFilename + ".txt", "w")
+        f.write(options)
+        f.close()
         # MatLab directory creation and export file
         matsave = saveToMat(data)
         mat_directory = directory + "\\matLab"
         create_dir(mat_directory)
-        mat_filename = mat_directory + "\\" + filename + currentDTime
+        mat_filename = mat_directory + "\\" + filename + "_" + currentDTime
         sio.savemat(mat_filename, {"object": matsave})
     # For the postProcess scripts
     else:
