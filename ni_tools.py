@@ -151,7 +151,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         winGraph.resize(1000, 600)
         winGraph.show()
 
-        pg.setConfigOptions(antialias=False)
+        pg.setConfigOptions(antialias=True)
         p = []
         curve = []
         plotCounter = 0
@@ -221,6 +221,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                 # The current read buffer
                 current_buffer = read_task.read(number_of_samples_per_channel=bufferSize)
                 current_buffer = np.array(current_buffer)
+                current = np.array(current_buffer)
                 # This is the variable that stores the data for saving
                 values_read[:, timeCounter:timeCounter+bufferSize] = current_buffer
                 # Calculations needed depending on the channel
@@ -231,8 +232,8 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                     # Plotting
                 for i in range(0, numPlots, 6):
                     if numPlots > 1:
-                        curve[i].setData(tVec, current_buffer[0,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+1].setData(tVec, current_buffer[1,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i].setData(tVec, current[0,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+1].setData(tVec, current[1,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+2].setData(fftfreq, gz.amp2db(spectra[0, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+3].setData(fftfreq, gz.amp2db(spectra[1, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+4].setData(fftfreq, HdB[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
