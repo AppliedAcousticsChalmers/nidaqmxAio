@@ -2,15 +2,17 @@ import numpy as np
 import colorednoise as cn
 from scipy import signal
 
+
 def half_hann(f, sr, side):
-    win_samples = int(sr/f/4)
-    T = win_samples/sr
+    win_samples = int(sr / f / 4)
+    T = win_samples / sr
     tvec = np.linspace(0, T, win_samples)
     if side == 'right':
-        win = np.cos(f*2*np.pi*tvec)**2
+        win = np.cos(f * 2 * np.pi * tvec)**2
     elif side == 'left':
-        win = np.sin(f*2*np.pi*tvec)**2
+        win = np.sin(f * 2 * np.pi * tvec)**2
     return win
+
 
 def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage_out, cutoffTime=0):
     """Create the output signal to be measured.
@@ -40,18 +42,26 @@ def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage
         else:
             print('Non supported noise type. Reverting to pink noise')
             signal_unpadded = cn.powerlaw_psd_gaussian(1, number_of_samples)
+        win_left = half_hann(10, sample_rate, 'left')
+        win_right = half_hann(10, sample_rate, 'right')
+        signal_unpadded[-len(win_right):] *= win_right
+        signal_unpadded[:len(win_right)] *= win_left
     elif sig[0] == "tone":
         f = int(signal_type[1])
         win_right = half_hann(f, sample_rate, 'right')
+        win_left = half_hann(f, sample_rate, 'left')
         signal_unpadded = np.sin(f * 2 * np.pi * time_vector)
         signal_unpadded[-len(win_right):] *= win_right
+        signal_unpadded[:len(win_right)] *= win_left
     elif sig[0] == "sweep":
         method = sig[1]
         f0 = int(signal_type[1])
         f1 = int(signal_type[2])
         win_right = half_hann(f1, sample_rate, 'right')
+        win_left = half_hann(f0, sample_rate, 'left')
         signal_unpadded = signal.chirp(time_vector, f0, time_of_signal, f1, method, phi=90)
         signal_unpadded[-len(win_right):] *= win_right
+        signal_unpadded[:len(win_left)] *= win_left
     else:
         print('Unlnown signal type. Reverting to pink noise')
         signal_unpadded = cn.powerlaw_psd_gaussian(1, number_of_samples)
