@@ -8,19 +8,6 @@ import os, errno
 # from scipy.interpolate import interp1d
 import warnings
 
-def sftpget(remotefile, remotepath='/home/gz/peaks_calc/', localpath='',
-            adr="tapc18.ta.chalmers.se", usr="gz", pwd="zaxosZAXOS0"):
-    import paramiko
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(adr, username=usr, password=pwd)
-    sftp = ssh.open_sftp()
-    localpath = localpath + remotefile
-    remotepath = remotepath + remotefile
-    sftp.get(remotepath, localpath)
-    sftp.close()
-    ssh.close()
-
 
 def extrap1d(interpolator):
     xs = interpolator.x
@@ -175,143 +162,6 @@ def lpf(x, fs, tau=0.125):
     return y, ya
 
 
-def cnossos_source(speed):
-    fc = np.array([63., 125., 250., 500., 1000., 2000., 4000., 8000.])
-    ref_speed = 70
-    coeffs = np.zeros([3, 6, 8])
-    # category 1 (passenger cars)
-    coeffs[0, :, :] = [[79.7, 85.7, 84.5, 90.2, 97.3, 93.9, 84.1, 74.3],  # A_R
-                       [30.0, 41.5, 38.9, 25.7, 32.5, 37.2, 39.0, 40.0],  # B_R
-                       [94.5, 89.2, 88.0, 85.9, 84.2, 86.9, 83.3, 76.1],  # A_P
-                       [-1.3, 7.2, 7.7, 8.0, 8.0, 8.0, 8.0, 8.0],  # B_P  # b
-                       [0.0, 0.0, 0.0, 2.6, 2.9, 1.5, 2.3, 9.2],  # a
-                       [0.0, 0.0, 0.0, -3.1, -6.4, -14.0, -22.4, -11.4]]  # b
-
-    # category 2 (medium heavy vehicles)
-    coeffs[1, :, :] = [[84.0, 88.7, 91.5, 96.7, 97.4, 90.0, 83.8, 80.5],  # A_R
-                       [30.0, 35.8, 32.6, 23.8, 30.1, 36.2, 38.3, 40.1],  # B_R
-                       [101., 96.5, 98.8, 96.8, 98.6, 95.2, 88.8, 82.7],  # A_P
-                       [-1.9, 4.7, 6.4, 6.5, 6.5, 6.5, 6.5, 6.5],  # B_P
-                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # a
-                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]  # b
-
-    # category 3 (heavy duty vehicles)
-    coeffs[2, :, :] = [[87.0, 91.7, 94.1, 100.7, 100.8, 94.3, 87.1, 82.5],  # A_R
-                       [30.0, 33.5, 31.3, 25.4, 31.8, 37.1, 38.6, 40.6],  # B_R
-                       [104.4, 100.6, 101.7, 101.0, 100.1, 95.9, 91.3, 85.3],  # A_P
-                       [0.0, 3.0, 4.6, 5.0, 5.0, 5.0, 5.0, 5.0],  # B_P
-                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # a
-                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]  # b
-
-    lw_roll = coeffs[:, 0, :] + coeffs[:, 1, :] * np.log10(speed / ref_speed)
-    lw_prop = coeffs[:, 2, :] + coeffs[:, 3, :] * ((speed - ref_speed) / ref_speed)
-    lw_ex = np.zeros([3, 11])
-
-    # for i in range(3):
-    #     lw_roll_ex[i, :] = np.insert(np.array(lw_roll[i, :]), [0, 0, len(lw_roll[i, :])], interp([16., 31.5, 16000.], fc, lw_roll[i, :]))
-    #     lw_prop_ex[i, :] = np.insert(np.array(lw_prop[i, :]), [0, 0, len(lw_roll[i, :])], interp([16., 31.5, 16000.], fc, lw_prop[i, :]))
-    fc = np.array([16., 31.5, 63., 125., 250., 500., 1000., 2000., 4000., 8000., 16000.])
-
-    lw = dbadd(lw_roll, lw_prop)
-
-    t = 90
-    a = (lw[..., 0]-t)/fc[2]
-    b = fc[:2]
-    lw_ex[..., :2] = np.dot(a[..., None], b[None, ...])+t
-    lw_ex[..., 2:-1] = lw
-    lw_ex[..., -1] = lw[..., -1]
-    return lw_ex, fc
-
-
-def imagine_source_new(speed):
-    ref_speed = 70
-    coeffs = np.zeros([3, 4, 27])
-    # category 1 (passenger cars)
-    coeffs[0, :, :] = [[69.9, 69.9, 69.9, 74.9, 74.9, 74.9, 79.3, 82, 81.2, 80.9, 78.9, 78.8, 80.5, 85, 87.9, 90.9, 93.3, 92.8, 91.5, 88.5, 84.9, 81.8, 78.7, 74.9, 71.8, 69.1, 65.6],  # A_R
-                       [33, 33, 33, 30, 30, 30, 41, 41.2, 42.3, 41.8, 38.6, 35.5, 32.9, 25, 25, 27, 33.4, 36.7, 37, 37.5, 37.5, 38.6, 39.6, 40, 39.9, 40.2, 40.3],  # B_R
-                       [87, 87, 87, 87.9, 90.8, 89.9, 86.9, 82.6, 81.9, 82.3, 83.9, 83.3, 82.4, 80.6, 80.2, 77.8, 78, 81.4, 82.3, 82.6, 81.5, 80.2, 78.5, 75.6, 73.3, 71, 68.1],  # A_P
-                       [0, 0, 0, 0, -3, 0, 8, 6, 6, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]]  # B_P
-
-    # category 2 (medium heavy vehicles)
-    coeffs[1, :, :] = [[76.5, 76.5, 76.5, 78.5, 79.5, 79.5, 82.5, 84.3, 84.7, 84.3, 87.4, 87.8, 89.8, 91.6, 93.5, 94.6, 92.4, 89.6, 88.1, 85.9, 82.7, 80.7, 78.8, 76.8, 76.7, 75.7, 74.5],
-                       [33, 33, 33, 30, 30, 30, 32.9, 35.9, 38.1, 36.5, 33.5, 30.6, 27.7, 21.9, 23.8, 28.4, 31.1, 35.4, 35.9, 36.7, 36.3, 37.7, 38.5, 39.8, 39.9, 40.2, 40.3],
-                       [93.9, 93.9, 94.1, 95, 97.3, 96.1, 92.5, 91.9, 90.4, 93.4, 94.4, 94.2, 93, 90.8, 92.1, 92.5, 94.1, 94.5, 92.4, 90.1, 87.6, 85.8, 83.8, 81.4, 80, 77.2, 75.4],
-                       [0, 0, 0, 0, -4, 0, 4, 5, 5.5, 6, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5]]
-
-    # category 3 (heavy duty vehicles)
-    coeffs[2, :, :] = [[79.5, 79.5, 79.5, 81.5, 82.5, 82.5, 85.5, 87.3, 87.7, 87.3, 89.5, 90.5, 93.8, 95.9, 97.3, 98, 95.6, 93.2, 91.9, 88.9, 85.5, 84.1, 82.2, 79.8, 78.6, 77.5, 76.8],
-                       [33, 33, 33, 30, 30, 30, 31.4, 32.8, 36, 34.6, 32.7, 29.3, 26.4, 24.2, 25.9, 30.4, 32.3, 36.5, 36.8, 38, 36.8, 38.5, 38.9, 38.5, 40.2, 40.8, 41],
-                       [95.7, 94.9, 94.1, 96.8, 101.8, 98.6, 95.5, 96.2, 95.7, 97.2, 96.3, 97.2, 95.8, 95.9, 96.8, 95.1, 95.8, 95, 92.7, 91.2, 88.7, 87.6, 87.2, 84.2, 82.7, 79.7, 77.6],
-                       [0, 0, 0, -4, 0, 4, 3, 3, 3, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]]
-
-    n_axles = np.array([[5], [5], [6]])
-    # dL_DAC16=0.95,  % addition due to asphalt DAC (Dense Asphalt Concrete), 0/16 (Stone sizes from 0 to 16 mm), 2 years old
-    dl_dac16 = 0
-    # lw_roll = dl_dac16 + 10*np.log10(n_axles/5)
-    lw_roll =  coeffs[:, 0, :] + coeffs[:, 1, :] * np.log10(speed / ref_speed) + 10*np.log10(n_axles/5)
-    lw_prop = coeffs[:, 2, :] + coeffs[:, 3, :]*((speed - ref_speed)/ref_speed)
-    fc = np.array([25., 31.5, 40., 50., 63., 80., 100., 125., 160.,
-                   200., 250., 315., 400., 500., 630., 800., 1000.,
-                   1250., 1600., 2000., 2500., 3150., 4000., 5000.,
-                   6300., 8000., 10000.])
-    lw_ex = np.zeros([3, 33])
-    lw_roll_ex = np.zeros([3, 33])
-    lw_prop_ex = np.zeros([3, 33])
-
-    # for i in range(3):
-    #     lw_roll_ex[i, :] = np.insert(np.array(lw_roll[i, :]), [0, 0, 0, len(lw_roll[i, :]), len(lw_roll[i, :]), len(lw_roll[i, :])], interp([12.5, 16., 20., 12500., 16000., 20000.], fc, lw_roll[i, :]))
-    #     lw_prop_ex[i, :] = np.insert(np.array(lw_prop[i, :]), [0, 0, 0, len(lw_roll[i, :]), len(lw_roll[i, :]), len(lw_roll[i, :])], interp([12.5, 16., 20., 12500., 16000., 20000.], fc, lw_prop[i, :]))
-    #     # fi_roll = interp1d(fc, lw_roll[i, :])
-    #     # fi_prop = interp1d(fc, lw_prop[i, :])
-    #     # fx_roll = extrap1d(fi_roll)
-    #     # fx_prop = extrap1d(fi_prop)
-    #     # lw_roll_ex[i,:] = np.insert(np.array(lw_roll[i, :]), 0, fx_roll([12.5, 16., 20.]))
-    #     # lw_prop_ex[i,:] = np.insert(np.array(lw_prop[i, :]), 0, fx_prop([12.5, 16., 20.]))
-
-    lw = dbadd(lw_roll, lw_prop)
-    fc = np.array([12.5, 16., 20., 25., 31.5, 40., 50., 63., 80., 100., 125.,
-                   160., 200., 250., 315., 400., 500., 630., 800., 1000.,
-                   1250., 1600., 2000., 2500., 3150., 4000., 5000., 6300.,
-                   8000., 10000., 12500., 16000., 20000.])
-
-    b = fc[:3]
-
-    t = 40
-    a = (lw_roll[..., 0]-t)/fc[3]
-    lw_roll_ex[..., :3] = np.dot(a[..., None], b[None, ...])+t
-    lw_roll_ex[..., 3:-3] = lw_roll
-    lw_roll_ex[..., -3:] = np.tile(lw_roll[..., -1:], 3)
-
-    t = 80
-    a = (lw_prop[..., 0]-t)/fc[3]
-    lw_prop_ex[..., :3] = np.dot(a[..., None], b[None, ...])+t
-    lw_prop_ex[..., 3:-3] = lw_prop
-    lw_prop_ex[..., -3:] = np.tile(lw_prop[..., -1:], 3)
-
-    lw_ex = dbadd(lw_roll_ex, lw_prop_ex)
-    return lw_ex, lw_prop_ex, lw_roll_ex, fc
-
-
-def airattdb1m(fvec, ht=40, tempC=24, pa=101325):
-    pr = 101325  # Reference ambient pressure
-    t = 273.15 + tempC  # Temperature in Kelvin
-    t0 = 293.15  # Reference temperature
-    t01 = 273.16
-
-    c = -6.8346 * (t01 / t) ** 1.261 + 4.6151
-    h = ht * pr / pa * 10 ** c  # Molar conc.of water vapour( %)
-    # Relaxation freq of oxygen
-    fro = (pa / pr) * (24 + 4.04 * 10 ** 4 * h * (0.02 + h) / (0.391 + h))
-    frn = (pa / pr) / np.sqrt(t / t0) * (
-        9 + 280 * h * np.exp(-4.17 * ((t / t0) ** (-1 / 3) - 1)))
-    airatt = 8.686 * fvec ** 2. * (1.84 * 1e-11 * (pr / pa) * np.sqrt(t / t0)
-                                   + (t / t0) ** (-2.5)
-                                   * (0.01275 * np.exp(-2239.1 / t)
-                                   * (fro + fvec ** 2 / fro) ** (-1)
-                                   + 0.1068 * np.exp(-3352 / t)
-                                   * (frn + fvec ** 2 / frn) ** (-1)))
-    return airatt
-
 
 def fspace(fc=np.array([63., 125., 250., 500., 1000., 2000., 4000., 8000.]),
            nf=15, bw=1, sc="log"):
@@ -338,35 +188,6 @@ def fspace(fc=np.array([63., 125., 250., 500., 1000., 2000., 4000., 8000.]),
     else:
         Exception('Non-supported argument for input "scale"')
     return freqvec, flimits
-
-
-def stddb(veh, speed, ver='new'):
-    speed = np.array(speed)
-    if ver == 'new':
-        if veh == 0:
-            fac1 = 4.94
-            fac2 = -0.7
-        if veh == 1:
-            fac1 = 6.35
-            fac2 = -0.9
-            speed[speed < 50] = 50
-    if ver == 'old':
-        if veh == 0:
-            fac1 = 5.5
-            fac2 = -0.7
-        if veh == 1:
-            fac1 = 10
-            fac2 = -0.9
-            speed[speed < 50] = 50
-    y = fac1*np.exp(fac2*speed/50)
-    return (np.random.random()-(y/2))*2
-
-
-def track_job(job, update_interval=1):
-    while job._number_left > 0:
-        print("{0}".format(job._number_left * job._chunksize),
-              end='|', flush=True)
-        time.sleep(update_interval)
 
 
 def dbsum(levels, axis=None):
@@ -407,18 +228,3 @@ def narrow2third(xdb, fnarrow):
         else:
             bands[a] = dbsum(xdb[idx])
     return bands, fc_pref
-
-
-def butter_bandpass(lowcut, highcut, fs, order=5):
-    nyq = 0.5 * fs
-    low = lowcut / nyq
-    high = highcut / nyq
-    b, a = butter(order, [low, high], btype='band')
-    return b, a
-
-
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-    y = lfilter(b, a, data)
-    # y = filtfilt(b, a, data)
-    return y

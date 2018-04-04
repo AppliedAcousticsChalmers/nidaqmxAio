@@ -7,7 +7,7 @@ from tqdm import tqdm
 # Program libraries
 import utils as gz
 import meas_signal as sig
-import post_processing as pp
+import TFestimation as TF
 # nidaqmx libraries
 import nidaqmx.system
 import nidaqmx
@@ -19,13 +19,13 @@ system = nidaqmx.system.System.local()
 
 
 # Data acquisition script
-def ni_io_tf(args, calibrationData=[1, 1], *cal):
-    if cal:
+def ni_io_tf(args, calibrationData=[1, 1], cal=False):
+    if cal == True:
         bufferSize = 8192
         sim_time = 5
         number_of_channels_in = [1]
         number_of_channels_out = [0]
-        sample_rate = 44100
+        sample_rate = 10000
     else:
         bufferSize = args.bufferSize
         sim_time = args.time
@@ -36,12 +36,12 @@ def ni_io_tf(args, calibrationData=[1, 1], *cal):
     if sample_rate % 2 != 0:
         sample_rate -= sample_rate % 2
         sample_rate = int(sample_rate)
-    signal_temp = sig.create_signal(args.sampleRate, args.time, args.pad_samples, args.signalType, args.aoRange)
+    signal_temp = sig.create_signal(args.sampleRate, args.time, args.pad_samples, args.signalType, args.aoRange, args.cutoffTime)
     signal = signal_temp[0]
     signal_unpadded = signal_temp[1]
     ai_range = args.aiRange
     ao_range = args.aoRange
-    number_of_samples = sim_time*sample_rate + args.pad_samples
+    number_of_samples = sim_time*sample_rate + args.pad_samples + args.cutoffTime * sample_rate
     # Recalculating the number of samples so they are an int multiple of the buffer size
     number_of_samples += bufferSize - (number_of_samples % bufferSize)
     if not np.sum(number_of_channels_out) <= 1:
@@ -145,11 +145,11 @@ def ni_io_tf(args, calibrationData=[1, 1], *cal):
         # Figure creation
         global app
         app = QtGui.QApplication([])
-        global win
-        win = pg.GraphicsLayoutWidget()
-        win.setWindowTitle('And awaaaaay we go!')
-        win.resize(1000, 600)
-        win.show()
+        global winGraph
+        winGraph = pg.GraphicsLayoutWidget()
+        winGraph.setWindowTitle('And awaaaaay we go!')
+        winGraph.resize(1000, 600)
+        winGraph.show()
 
         pg.setConfigOptions(antialias=False)
         p = []
@@ -159,7 +159,7 @@ def ni_io_tf(args, calibrationData=[1, 1], *cal):
             numPlots = 1
             plotsPerRow = 1
         elif sum(number_of_channels_in) == 2:
-            numPlots = 4
+            numPlots = 5
             plotsPerRow = 2
         else:
             numPlots = sum(number_of_channels_in) * 4
@@ -168,42 +168,49 @@ def ni_io_tf(args, calibrationData=[1, 1], *cal):
         for i in range(numPlots):
             # if i==selection and sum(number_of_channels_in) !=1:j = 1; continue
             # else: j = i
-            if plotCounter == 0:
-                p.append(win.addPlot(title='Spectum Ch:'+str(i)))
+            if plotCounter == 1:
+                p.append(winGraph.addPlot(title='Spectrum Ch:'+str(i)))
                 p[i].showGrid(True, True)
-                # p[i].setRange(yRange=[-100, 0])
-                if sum(number_of_channels_in) > 1:
-                    p[i].setLogMode(True, False)
-                    curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(173, 255, 47)))
-                    curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(200, 200, 200)))
-                else:
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
+                p[i].setLogMode(True, False)
+                curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(173, 255, 47)))
+                curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(200, 200, 200)))
                 plotCounter += 1
-            elif plotCounter == 1:
-                p.append(win.addPlot(title='H Ch: '+str(i)))
+            elif plotCounter == 2:
+                p.append(winGraph.addPlot(title='H Ch: '+str(i)))
                 p[i].setLogMode(True, False)
                 p[i].showGrid(True, True)
                 # p[i].setRange(yRange=[-100, 0])
                 curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(200, 200, 200)))
                 plotCounter += 1
                 if sum(number_of_channels_in) == 2:
-                    win.nextRow()
-            elif plotCounter == 2:
-                p.append(win.addPlot(title='IR Ch: '+str(i)))
+                    winGraph.nextRow()
+            elif plotCounter == 3:
+                p.append(winGraph.addPlot(title='IR Ch: '+str(i)))
                 p[i].setLogMode(False, False)
                 p[i].showGrid(True, True)
                 # p[i].setRange(yRange=[-0.05, 0.05])
                 curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
                 plotCounter += 1
+            elif plotCounter == 0:
+                p.append(winGraph.addPlot(title='Time Signals'+str(i), colspan=2))
+                p[i].showGrid(True, True)
+                p[i].setRange(yRange=[-args.aiRange, args.aiRange])
+                if sum(number_of_channels_in) > 1:
+                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(173, 255, 47)))
+                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
+                else:
+                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
+                plotCounter += 1
+                winGraph.nextRow()
             else:
-                p.append(win.addPlot(title='gamma2 Ch: '+str(i)))
+                p.append(winGraph.addPlot(title='gamma2 Ch: '+str(i)))
                 p[i].setLogMode(True, False)
                 p[i].showGrid(True, True)
                 p[i].setRange(yRange=[0, 1.1])
                 curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(200, 200, 200)))
                 plotCounter += 1
             if (i+1) % plotsPerRow == 0 and sum(number_of_channels_in) != 2:
-                win.nextRow()
+                winGraph.nextRow()
                 plotCounter = 0
 
         # Main loop
@@ -218,17 +225,19 @@ def ni_io_tf(args, calibrationData=[1, 1], *cal):
                 values_read[:, timeCounter:timeCounter+bufferSize] = current_buffer
                 # Calculations needed depending on the channel
                 if number_of_channels_in[0] >= 2:
-                    previous_buffer, spectra, blockidx, H, HdB, H_phase, IR, gamma2 = pp.h1_estimator_live(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, selection)
+                    previous_buffer, spectra, blockidx, H, _, HdB, H_phase, IR, gamma2 = TF.h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, selection)
                 else:
                     spectra = np.array(current_buffer)
                     # Plotting
-                for i in range(0, numPlots, 4):
+                for i in range(0, numPlots, 6):
                     if numPlots > 1:
-                        curve[i].setData(fftfreq, gz.amp2db(spectra[0, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+1].setData(fftfreq, gz.amp2db(spectra[1, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+2].setData(fftfreq, HdB[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+3].setData(tVec, IR.real[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+4].setData(fftfreq, gamma2[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i].setData(tVec, current_buffer[0,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+1].setData(tVec, current_buffer[1,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+2].setData(fftfreq, gz.amp2db(spectra[0, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+3].setData(fftfreq, gz.amp2db(spectra[1, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+4].setData(fftfreq, HdB[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+5].setData(tVec, IR.real[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+6].setData(fftfreq, gamma2[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
                     else:
                         curve[i].setData(spectra, antialias=True, downsample=downsample, downsampleMethod='subsample')
                     pg.QtGui.QApplication.processEvents()

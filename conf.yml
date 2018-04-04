@@ -1,6 +1,14 @@
-time: 6
+time: 15
 sampleRate: 44100
-channelsIn: [2]
+channelsIn: 2
 channelsOut: [2]
-signalType: ["sweep_linear", 20, 20000]
+signalType: [sweep_logarithmic, 100,2000]
+newMeasurement: 1
+pad_samples: 0
+aoRange: 0.4
+aiRange: 5
+cutoffTime: 0
+calibration: a	
+#postProcess: []
+bufferSize: 4096
 # this is a comment

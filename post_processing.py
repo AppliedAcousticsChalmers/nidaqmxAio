@@ -4,10 +4,13 @@ import plotly.offline as py
 import plotly.graph_objs as go
 import numpy as np
 import math
-from scipy import signal, array
+from scipy import signal, array, polyfit, polyval
+from scipy.signal import hilbert
 from tqdm import tqdm
 # Program libraries
 import utils as gz
+import TFestimation as TF
+import filters as fl
 
 
 def mic_calibration(measurements, sensitivity):
@@ -22,60 +25,7 @@ def mic_calibration(measurements, sensitivity):
 
     return calibration
 
-
-def h1_estimator_live(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, refCH):
-    current_buffer[:refCH, :] = (current_buffer[:refCH, :] / micAmp) * calibrationData[0]
-    current_buffer[refCH+1:, :] = (current_buffer[refCH+1:, :] / micAmp) * calibrationData[0]
-    blockSize = int(len(current_buffer[0]))
-    nCHin = int(len(current_buffer))
-    # window creation
-    win = signal.hann(blockSize, sym=True)
-    scaling = math.sqrt(np.sum(win ** 2) / blockSize)
-    win = win / scaling
-
-    spectra = np.zeros((nCHin, blockSize), dtype=complex)
-    for chidx in range(nCHin):
-        # Applying Hanning window
-        current_buffer[chidx, ...] = current_buffer[chidx, ...]*win
-        # fft
-        spectra[chidx, ...] = np.fft.fft(current_buffer[chidx, ...]) / blockSize
-    # Calculating Sij, ASij, ADij (ij corresponds to each channel)
-    S = np.zeros((nCHin, nCHin, blockSize), dtype=complex)
-    AD = np.zeros((nCHin, nCHin, blockSize), dtype=complex)
-    AS = np.zeros((nCHin, nCHin, int(blockSize // 2)), dtype=complex)
-    H = np.zeros((nCHin, int(blockSize // 2)), dtype=complex)
-    H_phase = np.zeros((nCHin, int(blockSize // 2)), dtype=float)
-    HD = np.zeros((nCHin, int(blockSize)), dtype=complex)
-    IR = np.zeros((nCHin, int(blockSize)), dtype=complex)
-    HdB = np.zeros((nCHin, int(blockSize // 2)))
-    gamma2 = np.zeros((nCHin, int(blockSize // 2)))
-    for i in range(nCHin):
-        for j in range(nCHin):
-            if i != j and i != refCH:
-                continue
-            S[i, j, ...] = np.multiply(spectra.conj()[i, ...], spectra[j, ...])
-            if blockidx == 0:
-                AD[i, j, ...] = S[i, j, ...]
-            else:
-                AD[i, j, ...] = previous_buffer[i, j, ...] - ((previous_buffer[i, j, ...] - S[i, j, ...]) / (blockidx + 1))
-            AS[i, j, 0] = AD[i, j, 0]
-            AS[i, j, -1] = AD[i, j, int(blockSize) // 2]
-            AS[i, j, 1:-1] = 2 * AD[i, j, 1:int(blockSize // 2) - 1]
-    for i in range(nCHin):
-        if i == refCH:
-            continue
-        H[i, ...] = np.divide(AS[refCH, i, ...], AS.real[refCH, refCH, ...])
-        HD[i, ...] = np.divide(AD[refCH, i, ...], AD[refCH, refCH, ...])
-        IR[i, ...] = np.fft.ifft(HD[i, ...])
-        H_phase[i, ...] = np.unwrap(np.angle(H[i, ...]))  # * np.pi/ sr
-        gamma2[i, ...] = (abs(AS[refCH, i, ...] ** 2)) / (np.multiply(AS.real[refCH, refCH, ...], AS.real[i, i, ...]))
-        HdB[i, ...] = gz.amp2db(H[i, ...])
-    previous_buffer = AD
-    blockidx += 1
-    return previous_buffer, spectra, blockidx, H, HdB, H_phase, IR, gamma2
-
-
-def h1_estimator(filename, blockSize, calibrationData):
+def TFcalc(filename, blockSize, calibrationData):
 
     # Reading the configuration
     print("Importing raw data... ", end="")
@@ -87,6 +37,7 @@ def h1_estimator(filename, blockSize, calibrationData):
     micAmp = measurements["micAmp"]
     blockSize = int(blockSize)  # is gonna be handled as a command line input
     signalUnpadded = measurements["Unpadded_signal"]
+    signalType = measurements["Signal"]
     # Initial calculations
     keys = list(measurements.keys())
     dataCH = [i1 for i1, s1 in enumerate(keys) if "cDAQ" in s1]
@@ -94,115 +45,85 @@ def h1_estimator(filename, blockSize, calibrationData):
     lastCH = dataCH[-1]
     keys = keys[firstCH:lastCH+1]
     refCH = [i2 for i2, s2 in enumerate(keys) if measurements['Reference_channel'] in s2][0]
-    print(refCH)
     values = list(measurements.values())
     data = np.array(values[firstCH:lastCH+1])
     nCHin = int(len(data))
     print("Completed")
+
     # Removing the zero padding of the signal
-    if simTime < 5:
+    if simTime < 5 or "sweep" in signalType[0]:
         print("Removing the zero padding of the signal (This will take a while)... ", end="")
         convxymin = np.convolve((data[int(refCH), ...]), np.flipud(signalUnpadded), 'valid')
         convxymax = np.convolve(np.flipud(data[int(refCH), ...]), signalUnpadded, 'valid')
 
         pad_start = np.argmax(convxymin)
         pad_end = np.argmax(convxymax)
-        data = (data[..., pad_start:-pad_end] / calibrationData[1] * calibrationData[0]) / micAmp
+        data = data[..., pad_start:-pad_end]
         print("Completed")
-    else:
-        data[:refCH, :] = (data[:refCH, :] / micAmp) * calibrationData[0]
-        data[refCH+1:, :] = (data[refCH+1:, :] / micAmp) * calibrationData[0]
 
-    numberOfsamples = int(len(data[0]))
-    # Spectra calculations
-    print("Calculating the spectra... ", end="")
-    zeropad = blockSize - numberOfsamples % blockSize
-    nBlocks = int(numberOfsamples // blockSize)
-    data = np.pad(data, [[0, 0], [0, int(zeropad)]], 'constant', constant_values=0)
-    dataMatrix = np.zeros((nCHin, blockSize, nBlocks))
-    spectraMatrix = np.zeros((nCHin, blockSize, nBlocks), dtype=complex)
-    print("Completed")
+    if "noise" in signalType:
+        # Zeropadding
+        numberOfsamples = int(len(data[0]))
+        print("Zeropadding... ", end="")
+        zeropad = blockSize - numberOfsamples % blockSize
+        nBlocks = int(numberOfsamples // blockSize)
+        data = np.pad(data, [[0, 0], [0, int(zeropad)]], 'constant', constant_values=0)
+        dataMatrix = np.zeros((nCHin, blockSize, nBlocks))
+        print("Completed")
+        print("Signal padded with %i zeros at the end" % zeropad)
 
-    # window creation
-    print("Applying Hanning window... ", end="")
-    win = signal.hann(blockSize, sym=True)
-    scaling = math.sqrt(np.sum(win ** 2) / blockSize)
-    win = win / scaling
-    print("Completed")
 
-    # Arranging the data into blocks, Applying window and calculating the fft
-    print("Arranging the windowed spectra into blocks")
-    for chidx in range(nCHin):
-        i0 = 0
-        pbar1 = tqdm(total=nBlocks)
+        # Arranging the data into blocks, Applying window and calculating the fft
+        print("Arranging the data into blocks")
+        for chidx in range(nCHin):
+            i0 = 0
+            pbar1 = tqdm(total=nBlocks)
+            for idx in range(nBlocks):
+                # Arranging into blocks
+                dataMatrix[chidx, :, idx] = data[chidx, i0:i0+blockSize] #* win
+                i0 += blockSize
+                pbar1.update()
+            pbar1.close()
+
+        blockidx = 0
+        current_buffer = np.zeros((nCHin, int(blockSize)))
+        previous_buffer = np.zeros((nCHin, int(blockSize)))
+        print("Processing the data")
+        pbar2 = tqdm(total=nBlocks)
         for idx in range(nBlocks):
-            # Arranging into blocks, applying the window
-            dataMatrix[chidx, :, idx] = data[chidx, i0:i0+blockSize] * win
-            # Calculating the fft
-            spectraMatrix[chidx, :, idx] = np.fft.fft(dataMatrix[chidx, :, idx]) / blockSize
-            i0 += blockSize
-            pbar1.update()
-        pbar1.close()
+            current_buffer = dataMatrix[:,:,idx]
+            previous_buffer, _, blockidx, H, HD, HdB, H_phase, IR, gamma2 = TF.h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, refCH)
+            pbar2.update()
+        pbar2.close()
 
-    # Calculating Sij, ASij, AGij, Hij, gamma2ij (ij corresponds to each channel)
-    print("Calculating the Double sided auto and cross spectra")
-    S = np.zeros((nCHin, nCHin, blockSize), dtype=complex)
-    AD = np.zeros((nCHin, nCHin, blockSize), dtype=complex)
-    AS = np.zeros((nCHin, nCHin, blockSize // 2), dtype=complex)
+        print("Saving the processed data... ", end="")
+        fftfreq = np.fft.rfftfreq(blockSize, 1 / sr)
+        tVec = np.linspace(0, len(IR[0, :]) / sr, len(IR[0, :]))
+        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "gamma2ij": gamma2, "fftfreq": fftfreq, "tVec": tVec})
+        print("Completed")
 
-    for i in range(nCHin):
-        for j in range(nCHin):
-            if i != j and i != refCH:
-                continue
-            pbar2 = tqdm(total=nBlocks)
-            for blockidx in range(nBlocks):
-                S[i, j, :] = np.multiply(spectraMatrix.conj()[i, :, blockidx], spectraMatrix[j, :, blockidx])
-                if blockidx == 0:
-                    AD[i, j, :] = S[i, j, :]
-                else:
-                    AD[i, j, :] -= (AD[i, j, :] - S[i, j, :]) / (blockidx + 1)
-                pbar2.update()
-            AS[i, j, 0] = AD[i, j, 0]
-            AS[i, j, -1] = AD[i, j, int(blockSize // 2)]
-            AS[i, j, 1:-1] = 2 * AD[i, j, 1:int(blockSize // 2 - 1)]
-            pbar2.close()
+    elif "sweep" in signalType[0]:
+        #Determining the start and stop frequencies of the signal
+        f0 = int(signalType[1])
+        f1 = int(signalType[2])
+        print("Starting frequency f0 = %i Hz" % f0 )
+        print("Ending frequency f1 = %i Hz" % f1 )
 
-    # Calculating ASij, Hij, gamma2ij
-    print("Calculating the single sided spectra, FRFs and coherence")
-    H = np.zeros((nCHin, blockSize // 2), dtype=complex)
-    H_phase = np.zeros((nCHin, blockSize // 2), dtype=float)
-    HD = np.zeros((nCHin, blockSize), dtype=complex)
-    IR = np.zeros((nCHin, blockSize), dtype=complex)
-    HdB = np.zeros((nCHin, blockSize // 2), dtype=float)
-    gamma2 = np.zeros((nCHin, blockSize // 2), dtype=float)
-    SNR = np.zeros((nCHin, blockSize // 2), dtype=float)
+        #Main calculations
+        print("Processing the data...", end="")
+        H, HD, HdB, H_phase, IR, fftfreq, tVec = TF.deconvolution(data, sr, calibrationData, micAmp, refCH, f0, f1)
+        print("Completed")
 
-    pbar3 = tqdm(total=nCHin)
-    for i in range(nCHin):
-        if i == refCH:
-            pbar3.update()
-            continue
-        H[i, :] = np.divide(AS[refCH, i, :], AS.real[refCH, refCH, :])
-        HD[i, :] = np.divide(AD[refCH, i, :], AD.real[refCH, refCH, :])
-        IR[i, :] = np.fft.ifft(HD[i, :])
-        H_phase[i, :] = np.unwrap(np.angle(H[i, :]))  # * np.pi/ sr
-        gamma2[i, :] = (abs(AS[refCH, i, :] ** 2)) / (np.multiply(AS.real[refCH, refCH, :], AS.real[i, i, :]))
-        SNR[i, :] = gamma2[i, :] / (1 - gamma2[i, :])
-        HdB[i, :] = gz.amp2db(H[i, :], ref=1)  # - 20 * np.log10(abs(micAmp))
-        pbar3.update()
-    pbar3.close()
-
-    print("Saving the processed data... ", end="")
-    fftfreq = np.fft.rfftfreq(blockSize, 1 / sr)
-    tVec = np.linspace(0, len(IR[0, :]) / sr, len(IR[0, :]))
-    measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "gamma2ij": gamma2, "fftfreq": fftfreq, "tVec": tVec})
-    print("Completed")
+        #Saving the data
+        print("Saving the processed data... ", end="")
+        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "fftfreq": fftfreq, "tVec": tVec})
+        print("Completed")
 
     for pltidx in range(nCHin):
         if pltidx == refCH:
             continue
         plot1y = HdB[pltidx, :]
-        plot2y = gamma2[pltidx, :]
+        if "noise" in signalType: plot2y = gamma2[pltidx, :]
         plot3y = IR.real[pltidx, :]
         plot4y = H_phase[pltidx, :]
         freqs = fftfreq[:-1]
@@ -215,11 +136,12 @@ def h1_estimator(filename, blockSize, calibrationData):
             name='$H_{[%i,%i]}$ in dB' % (refCH, pltidx)
         )
 
-        trace2 = go.Scatter(
-            x=freqs,
-            y=plot2y,
-            name='$\\gamma^2_{[%i,%i]}$' % (refCH, pltidx)
-        )
+        if "noise" in signalType:
+           trace2 = go.Scatter(
+               x=freqs,
+               y=plot2y,
+               name='$\\gamma^2_{[%i,%i]}$' % (refCH, pltidx)
+           )
 
         trace3 = go.Scatter(
             x=tvec,
@@ -236,7 +158,7 @@ def h1_estimator(filename, blockSize, calibrationData):
         fig = tools.make_subplots(rows=2, cols=2, subplot_titles=('HdB', 'gamma2', 'IR', 'H_phase'))
 
         fig.append_trace(trace1, 1, 1)
-        fig.append_trace(trace2, 1, 2)
+        if "noise" in signalType: fig.append_trace(trace2, 1, 2)
         fig.append_trace(trace3, 2, 1)
         fig.append_trace(trace4, 2, 2)
 
@@ -250,3 +172,142 @@ def h1_estimator(filename, blockSize, calibrationData):
     print("Process Finished")
 
     return measuredFRFs
+
+
+def T60Shroeder(filename, blockSize, calibrationData):
+    """Calculates the T_60 values in the bandwidth specified, using Schroeder's
+       backwards intergration method.
+
+       The function uses the calibration data, and the blockSize parameters to
+       calculate the impulse responce of the room from the measured data folder,
+       prior to the T_60 calculation.
+
+       """
+    # Calculating the IR
+    print("Estimating the IR...", end="")
+    measurements = TFcalc(filename, blockSize, calibrationData)
+    print("Completed")
+
+    #Importing the required data
+    print("Importing the required data... ", end="")
+    sr = measurements["SampleRate"]
+    IR = measurements["IRij"]
+    tVec = measurements["tVec"]
+    fVec = measurements["fftfreq"]
+    print("Completed")
+
+    # Reading the configuration
+    print("Reading the configuration...", end="")
+    keys = list(measurements.keys())
+    dataCH = [i1 for i1, s1 in enumerate(keys) if "cDAQ" in s1]
+    firstCH = dataCH[0]
+    lastCH = dataCH[-1]
+    keys = keys[firstCH:lastCH+1]
+    refCH = [i2 for i2, s2 in enumerate(keys) if measurements['Reference_channel'] in s2][0]
+    IR = np.delete(IR, (refCH), axis=0)
+    print("completed")
+
+    print("Converting IR into 3rd octave bands")
+    IR_3rd, fvec_3rd = fl.filters(IR,sr).band_filter(20,sr / 2.56,"third")
+    IR_3rd = np.array(IR_3rd)[:,0,:]
+    T_60 = []
+    T_30 = []
+    for idx in range(0,len(IR_3rd-1)):
+
+        IR_current = IR_3rd.real[idx,:]
+        #Finding the analytical signal and taking it's envelope through the hilbert transform
+        s_anal = hilbert(IR_current)
+        envelope =  abs(s_anal)
+
+        #Calculating the moving average of the envelope
+        moav = fl.smooth(envelope, int(0.1 * sr), 'flat')
+        moav_dB = fl.amp2dB(moav)
+
+        #Finding the correct threshold for the calculation of tau
+        threshold = np.average(moav_dB[int(len(moav)*0.75):int(len(moav_dB)*0.75)+2000])
+        tau = fl.findTau(moav_dB, tVec, threshold)
+
+        #Calculating the Shroeder curve
+        Rev_int = np.zeros((len(IR_current[:tau])))
+        Rev_int[tau::-1] =(np.cumsum(moav[tau:0:-1]) / np.sum(moav[0:tau]))
+        Rev_int_dB = fl.amp2dB(Rev_int)
+
+        #Fitting a line in the Shroeder curve
+        fit_range = int(len(Rev_int_dB) * 0.75)
+        x = tVec[:fit_range]
+        Rev_int_fit = Rev_int_dB[:fit_range]
+        (b, a) = polyfit(x, Rev_int_fit, 1)
+        xr=polyval([b,a],tVec)
+
+        #Fitting the guiding lines
+        x_5dB = polyval([0,max(Rev_int_dB)-5],tVec)
+        x_35dB = polyval([0,max(Rev_int_dB)-35],tVec)
+
+        #Calculating T_60
+        T_60.append( -60 / b)
+
+        #Calculating T_30
+        t_5dB = tVec[np.argmin(abs(xr-x_5dB))]
+        t_35dB = tVec[np.argmin(abs(xr-x_35dB))]
+        T_30.append(t_35dB - t_5dB)
+
+
+        # #Plotting
+        # plot1y = fl.amp2dB(IR_current)
+        # plot2y = fl.amp2dB(envelope)
+        # plot3y = fl.amp2dB(moav)
+        # plot4y = fl.amp2dB(Rev_int)
+        # plot5y = xr
+        # plot6y = x_5dB
+        # plot7y = x_35dB
+
+        # trace1 = go.Scatter(
+        #     x = tVec,
+        #     y = plot1y,
+        #     name='IR at %i Hz ' % (fvec_3rd[idx]),
+        #     text = ['T_60 %i' % (T_60[idx])],
+        #     textposition='bottom'
+        # )
+
+        # trace2 = go.Scatter(
+        #     x=tVec,
+        #     y=plot2y,
+        #     name='envelope %i Hz' % (fvec_3rd[idx])
+        # )
+
+        # trace3 = go.Scatter(
+        #     x=tVec,
+        #     y=plot3y,
+        #     name='moav %i Hz' % (fvec_3rd[idx])
+        # )
+
+        # trace4 = go.Scatter(
+        #     x=tVec,
+        #     y=plot4y,
+        #     name='Rev intH %i Hz' % (fvec_3rd[idx])
+        # )
+
+        # trace5 = go.Scatter(
+        #     x=tVec,
+        #     y=plot5y,
+        #     name='fit %i Hz' % (fvec_3rd[idx])
+        # )
+
+        # trace6 = go.Scatter(
+        #     x=tVec,
+        #     y=plot6y,
+        #     name='-5dB'
+        # )
+
+        # trace7 = go.Scatter(
+        #     x=tVec,
+        #     y=plot7y,
+        #     name='-35dB'
+        # )
+        # data = [trace1, trace2, trace4]#, trace3, trace5, trace6, trace7]
+        # py.plot(data, filename=filename + '.html')
+
+    #Saving the data
+    RT = {'T60Schroeder': T_60, 'T30Schroeder': T_30, 'fVec_3rd': fvec_3rd}
+
+    return [measurements, RT]
