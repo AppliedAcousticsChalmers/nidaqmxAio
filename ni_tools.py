@@ -8,6 +8,7 @@ from tqdm import tqdm
 import utils as gz
 import meas_signal as sig
 import TFestimation as TF
+import filters
 # nidaqmx libraries
 import nidaqmx.system
 import nidaqmx
@@ -254,7 +255,8 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         if number_of_channels_in[idx] == 0 or idx_ai == []:
             continue
         for ch_num in range(number_of_channels_in[idx]):
-            measurements.update({(channel_list[device_idx]['ai'][ch_num]): np.array(values_read)[ch_count, ...]})
+            values_read_filt = filters.filters(np.array(values_read[ch_count, :]), args.sampleRate).butter_bandpass_filter(5,args.sampleRate/2)
+            measurements.update({(channel_list[device_idx]['ai'][ch_num]): values_read_filt})
             ch_count += 1
 
     if number_of_channels_in[0] >= 2:
