@@ -197,8 +197,8 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                 p[i].showGrid(True, True)
                 p[i].setRange(yRange=[-args.aiRange, args.aiRange])
                 if sum(number_of_channels_in) > 1:
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(173, 255, 47)))
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
+                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(173, 255, 47, 0.7)))
+                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200, 0.7)))
                 else:
                     curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
                 plotCounter += 1
@@ -232,9 +232,15 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                     spectra = np.array(current_buffer)
                     # Plotting
                 for i in range(0, numPlots, 6):
+                    # Show clipping
+                    if max(abs(current)>=args.aiRange:
+                           pen = (255, 0, 0)
+                    else:
+                           pen = (200,200,200, 0.7)
+
                     if numPlots > 1:
                         curve[i].setData(tVec, current[0,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+1].setData(tVec, current[1,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i+1].setData(tVec, current[1,:], pen=pen, antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+2].setData(fftfreq, gz.amp2db(spectra[0, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+3].setData(fftfreq, gz.amp2db(spectra[1, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+4].setData(fftfreq, HdB[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
