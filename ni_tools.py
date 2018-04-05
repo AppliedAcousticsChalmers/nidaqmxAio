@@ -264,7 +264,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         if number_of_channels_in[idx] == 0 or idx_ai == []:
             continue
         for ch_num in range(number_of_channels_in[idx]):
-            values_read_filt = filters.filters(np.array(values_read[ch_count, :]), args.sampleRate).butter_bandpass_filter(5,args.sampleRate/2)
+            values_read_filt = filters.filters(np.array(values_read[ch_count, :]), args.sampleRate).butter_bandpass_filter(5,args.sampleRate/2.56)
             measurements.update({(channel_list[device_idx]['ai'][ch_num]): values_read_filt})
             ch_count += 1
 
