@@ -197,8 +197,8 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                 p[i].showGrid(True, True)
                 p[i].setRange(yRange=[-args.aiRange, args.aiRange])
                 if sum(number_of_channels_in) > 1:
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(173, 255, 47, 0.7)))
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200, 0.7)))
+                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(173, 255, 47)))
+                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
                 else:
                     curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
                 plotCounter += 1
@@ -228,19 +228,20 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                 # Calculations needed depending on the channel
                 if number_of_channels_in[0] >= 2:
                     previous_buffer, spectra, blockidx, H, _, HdB, H_phase, IR, gamma2 = TF.h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, selection)
+                    current_max_val = max(abs(current[1,:]))
                 else:
-                    spectra = np.array(current_buffer)
-                    # Plotting
-                for i in range(0, numPlots, 6):
+                    current_max_val = max(abs(current))
                     # Show clipping
-                    if max(abs(current)) >= args.aiRange:
-                        pen = (255, 0, 0)
-                        clipped = True
-                    else:
-                        pen = (200, 200, 200, 0.7)
-                    if clipped:
-                        pen = (255, 127, 80, 0.7)
+                if current_max_val >= args.aiRange:
+                    pen = (255, 0, 0, 130)
+                    clipped = True
+                elif not clipped:
+                    pen = (200, 200, 200, 130)
+                else:
+                    pen = (255, 127, 80, 130)
 
+                   # Plotting
+                for i in range(0, numPlots, 6):
                     if numPlots > 1:
                         curve[i].setData(tVec, current[0,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+1].setData(tVec, current[1,:], pen=pen, antialias=True, downsample=downsample, downsampleMethod='subsample')
@@ -250,7 +251,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                         curve[i+5].setData(tVec, IR.real[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
                         curve[i+6].setData(fftfreq, gamma2[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
                     else:
-                        curve[i].setData(spectra, antialias=True, downsample=downsample, downsampleMethod='subsample')
+                        curve[i].setData(current, pen=pen, antialias=True, downsample=downsample, downsampleMethod='subsample')
                     pg.QtGui.QApplication.processEvents()
 
                 timeCounter += bufferSize

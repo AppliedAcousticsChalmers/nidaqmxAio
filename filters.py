@@ -1,4 +1,5 @@
 import numpy as np
+import utils as gz
 from scipy.optimize import curve_fit
 from scipy.signal import butter, lfilter, filtfilt
 
@@ -84,6 +85,21 @@ class filters(object):
         y = filtfilt(b, a, self.data)
 
         return y
+
+    def removeDelay(self):
+        IR_a = gz.a_weighting(self.data, self.sr)
+        xcross_idx = np.where(np.diff(np.sign(IR_a)))[0]
+        avg = np.empty(len(xcross_idx)-1)
+
+        for i, _ in enumerate(xcross_idx[1:]):
+            avg[i] = np.average(abs(self.data[xcross_idx[i]:xcross_idx[i+1]+1]))
+
+        start_idx = xcross_idx[np.argmax(avg > 2e-4)]
+
+        IR_head = self.data[:start_idx]
+        IR_tail = self.data[start_idx:]
+
+        return IR_head, IR_tail
 
 
     def find_nearest(array,value):
@@ -201,3 +217,4 @@ def lorentz(x, *p):
     I, gamma, x0 = p
 
     return I * gamma**2 / ((x - x0)**2 + gamma**2)
+
