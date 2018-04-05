@@ -233,7 +233,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                     # Plotting
                 for i in range(0, numPlots, 6):
                     # Show clipping
-                    if max(abs(current)>=args.aiRange:
+                    if max(abs(current))>=args.aiRange:
                            pen = (255, 0, 0)
                     else:
                            pen = (200,200,200, 0.7)
