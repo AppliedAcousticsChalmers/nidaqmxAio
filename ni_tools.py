@@ -213,7 +213,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
             if (i+1) % plotsPerRow == 0 and sum(number_of_channels_in) != 2:
                 winGraph.nextRow()
                 plotCounter = 0
-
+        clipped = False
         # Main loop
         if idx_ai:
             pbar_ai = tqdm(total=number_of_samples)
@@ -233,10 +233,13 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
                     # Plotting
                 for i in range(0, numPlots, 6):
                     # Show clipping
-                    if max(abs(current))>=args.aiRange:
-                           pen = (255, 0, 0)
+                    if max(abs(current)) >= args.aiRange:
+                        pen = (255, 0, 0)
+                        clipped = True
                     else:
-                           pen = (200,200,200, 0.7)
+                        pen = (200, 200, 200, 0.7)
+                    if clipped:
+                        pen = (255, 127, 80, 0.7)
 
                     if numPlots > 1:
                         curve[i].setData(tVec, current[0,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
