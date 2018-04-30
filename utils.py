@@ -8,8 +8,8 @@ import os, errno
 # from scipy.interpolate import interp1d
 import warnings
 
-def sftpget(remotefile, remotepath='/home/gz/peaks_calc/', localpath='',
-            adr="tapc18.ta.chalmers.se", usr="gz", pwd="zaxosZAXOS0"):
+def sftpget(remotefile, remotepath, localpath='',
+            adr, usr, pwd):
     import paramiko
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
