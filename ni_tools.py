@@ -4,11 +4,13 @@ import pyqtgraph as pg
 import numpy as np
 import time
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 # Program libraries
 import utils as gz
 import meas_signal as sig
 import TFestimation as TF
 import filters
+import plotting as myPlt
 # nidaqmx libraries
 import nidaqmx.system
 import nidaqmx
@@ -33,25 +35,35 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         number_of_channels_in = args.channelsIn
         number_of_channels_out = args.channelsOut
         sample_rate = args.sampleRate
+
     # Setting the sampling frequency to be an even number, so the Niquist frequency is at the last bin of each block
     if sample_rate % 2 != 0:
         sample_rate -= sample_rate % 2
         sample_rate = int(sample_rate)
+
+    #Signal creation
+    signal_type = args.signalType[0].split("_")
     signal_temp = sig.create_signal(args.sampleRate, args.time, args.pad_samples, args.signalType, args.aoRange, args.cutoffTime)
     signal = signal_temp[0]
     signal_unpadded = signal_temp[1]
-    ai_range = args.aiRange
-    ao_range = args.aoRange
-    number_of_samples = sim_time*sample_rate + args.pad_samples + args.cutoffTime * sample_rate
-    # Recalculating the number of samples so they are an int multiple of the buffer size
-    number_of_samples += bufferSize - (number_of_samples % bufferSize)
     if not np.sum(number_of_channels_out) <= 1:
         signal = np.tile(signal, [np.sum(number_of_channels_out), 1])
+
+
+    # Reading the in/out range
+    ai_range = args.aiRange
+    ao_range = args.aoRange
+
+    # Recalculating the number of samples so they are an int multiple of the buffer size
+    number_of_samples = sim_time*sample_rate + args.pad_samples + args.cutoffTime * sample_rate
+    number_of_samples += bufferSize - (number_of_samples % bufferSize)
+    sim_time = number_of_samples / sample_rate
+
+    # Checking the microphone amplification
     micAmp = args.micAmp
-    if not micAmp:
-        micAmp = 1
-    else:
-        micAmp = int(micAmp)
+    if not micAmp: micAmp = 1
+    else: micAmp = int(micAmp)
+
     # Creating the dictionary to store the data
     measurements = {'simulationTime': sim_time, 'SampleRate': sample_rate, 'Signal': args.signalType, 'Input_range_in_Vrms': ai_range, 'Output_range_in_Vrms': ao_range, 'bufferSize': bufferSize, 'micAmp': micAmp, 'Unpadded_signal': signal_unpadded, 'Reference_channel': []}
 
@@ -61,7 +73,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         channel_list.append({"ai": [channels_ai.name for _, channels_ai in enumerate(device.ai_physical_chans)],
                              "ao":  [channels_ao.name for _, channels_ao in enumerate(device.ao_physical_chans)]})
 
-    # channels selected by user
+    # Channels selected by user
     idx_ai = []
     idx_ao = []
     if np.sum(number_of_channels_in) == 1:
@@ -80,25 +92,34 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
     if sum(number_of_channels_out) == 0:
         idx_ao = []
 
-    # reference input channel
+    # Reference input channel selection
+    ch_count = 0
+    chSelect = []
     if idx_ai != []:
-        ch_count = 0
-        chSelect = []
-        print("Please select which channel should be used as reference in post processing. (pressing enter will default to the first channel in the list)")
+        if sum(number_of_channels_in) > 1:print("Please select which channel should be used as reference in post processing. (pressing enter will default to the first channel in the list)")
         for idx, device_idx in enumerate(idx_ai):
             if number_of_channels_in[idx] == 0 or idx_ai == []:
                 continue
             for ch_num in range(number_of_channels_in[idx]):
                 chSelect.append(channel_list[device_idx]['ai'][ch_num])
-                print("[" + str(ch_count) + "]"+" "+chSelect[ch_count])
+                print("[" + str(ch_count) + "]" + " " + chSelect[ch_count])
                 ch_count += 1
-        selection = input()
-        if selection:
-            selection = int(selection)
-            refChannel = chSelect[selection]
+        if sum(number_of_channels_in) > 1:print("[" + str(ch_count) + "]" + " " + "No reference channel")
+        if sum(number_of_channels_in) > 1:
+            selection = input()
+            if selection:
+                if int(selection) == int(ch_count):
+                    selection = "none"
+                    refChannel = "none"
+                else:
+                    selection = int(selection)
+                    refChannel = chSelect[selection]
+            else:
+                refChannel = chSelect[0]
+                selection = 0
         else:
-            refChannel = chSelect[0]
-            selection = 0
+            selection = "none"
+            refChannel = "none"
         measurements.update({'Reference_channel': refChannel})
 
     # Setting up the in/out task
@@ -120,6 +141,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
             write_task.out_stream.regen_mode = nidaqmx.constants.RegenerationMode.DONT_ALLOW_REGENERATION
             write_task.timing.cfg_samp_clk_timing(rate=sample_rate, sample_mode=AcquisitionType.CONTINUOUS)
             write_task.write(signal)
+
         if idx_ao:
             write_task.control(TaskMode.TASK_COMMIT)
         if idx_ai:
@@ -129,147 +151,67 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         if idx_ai:
             read_task.start()
 
-        # Starting the data aquition/reproduction
+        # Starting the data acquisition/reproduction
 
-        # Intialization
-        tVec = np.linspace(0, bufferSize / sample_rate, bufferSize)
-        fftfreq = np.fft.rfftfreq(bufferSize, 1 / sample_rate)
-        fftfreq = fftfreq[:-1]
+        # Initialization
+
+        if 'live' in args.plotting:live_Plot = myPlt.livePlot(args, bufferSize, sample_rate, selection, chSelect)
+
         timeCounter = 0
         blockidx = 0
-        # previous_buffer = []
-        # current_buffer = []
         values_read = np.zeros((sum(number_of_channels_in), int(number_of_samples)))
         current_buffer = np.zeros((sum(number_of_channels_in), int(bufferSize)))
         previous_buffer = np.zeros((sum(number_of_channels_in), int(bufferSize)))
-
-        # Figure creation
-        global app
-        app = QtGui.QApplication([])
-        global winGraph
-        winGraph = pg.GraphicsLayoutWidget()
-        winGraph.setWindowTitle('And awaaaaay we go!')
-        winGraph.resize(1000, 600)
-        winGraph.show()
-
-        pg.setConfigOptions(antialias=True)
-        p = []
-        curve = []
-        plotCounter = 0
         if sum(number_of_channels_in) == 1:
-            numPlots = 1
-            plotsPerRow = 1
-        elif sum(number_of_channels_in) == 2:
-            numPlots = 5
-            plotsPerRow = 2
-        else:
-            numPlots = sum(number_of_channels_in) * 4
-            plotsPerRow = 4
-        downsample = numPlots*0+1
-        for i in range(numPlots):
-            # if i==selection and sum(number_of_channels_in) !=1:j = 1; continue
-            # else: j = i
-            if plotCounter == 1:
-                p.append(winGraph.addPlot(title='Spectrum Ch:'+str(i)))
-                p[i].showGrid(True, True)
-                p[i].setLogMode(True, False)
-                curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(173, 255, 47)))
-                curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(200, 200, 200)))
-                plotCounter += 1
-            elif plotCounter == 2:
-                p.append(winGraph.addPlot(title='H Ch: '+str(i)))
-                p[i].setLogMode(True, False)
-                p[i].showGrid(True, True)
-                # p[i].setRange(yRange=[-100, 0])
-                curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(200, 200, 200)))
-                plotCounter += 1
-                if sum(number_of_channels_in) == 2:
-                    winGraph.nextRow()
-            elif plotCounter == 3:
-                p.append(winGraph.addPlot(title='IR Ch: '+str(i)))
-                p[i].setLogMode(False, False)
-                p[i].showGrid(True, True)
-                # p[i].setRange(yRange=[-0.05, 0.05])
-                curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
-                plotCounter += 1
-            elif plotCounter == 0:
-                p.append(winGraph.addPlot(title='Time Signals'+str(i), colspan=2))
-                p[i].showGrid(True, True)
-                p[i].setRange(yRange=[-args.aiRange, args.aiRange])
-                if sum(number_of_channels_in) > 1:
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(173, 255, 47)))
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
-                else:
-                    curve.append(p[i].plot(tVec, np.zeros(len(tVec)), pen=(200, 200, 200)))
-                plotCounter += 1
-                winGraph.nextRow()
-            else:
-                p.append(winGraph.addPlot(title='gamma2 Ch: '+str(i)))
-                p[i].setLogMode(True, False)
-                p[i].showGrid(True, True)
-                p[i].setRange(yRange=[0, 1.1])
-                curve.append(p[i].plot(fftfreq, np.zeros(len(fftfreq)), pen=(200, 200, 200)))
-                plotCounter += 1
-            if (i+1) % plotsPerRow == 0 and sum(number_of_channels_in) != 2:
-                winGraph.nextRow()
-                plotCounter = 0
-        clipped = False
+            current_buffer = np.array(current_buffer).reshape(1,len(current_buffer[0]))
+            current = np.array(current_buffer).reshape(1,len(current_buffer[0]))
+            previous_buffer = np.array(previous_buffer).reshape(1,len(previous_buffer[0]))
+
+
         # Main loop
         if idx_ai:
             pbar_ai = tqdm(total=number_of_samples)
-            # if number_of_channels_in[0] >= 2:
             while timeCounter < number_of_samples:
                 # The current read buffer
-                current_buffer = read_task.read(number_of_samples_per_channel=bufferSize)
-                current_buffer = np.array(current_buffer)
-                current = np.array(current_buffer)
+                current_buffer_raw = read_task.read(number_of_samples_per_channel=bufferSize)
+                if sum(number_of_channels_in) > 1:
+                    current_buffer = np.array(current_buffer_raw)
+                    current = np.array(current_buffer_raw)
+                else:
+                    current_buffer[0,:] = np.array(current_buffer_raw)
+                    current[0,:] = np.array(current_buffer_raw)
+
+                if 'live' in args.plotting: live_Plot.livePlotClipp(current)
                 # This is the variable that stores the data for saving
                 values_read[:, timeCounter:timeCounter+bufferSize] = current_buffer
                 # Calculations needed depending on the channel
-                if number_of_channels_in[0] >= 2:
+                if signal_type[0]=='noise' and number_of_channels_in[0] == 2:
                     previous_buffer, spectra, blockidx, H, _, HdB, H_phase, IR, gamma2 = TF.h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, selection)
-                    current_max_val = max(abs(current[1,:]))
+                    if 'live' in args.plotting: live_Plot.livePlotUpdate_H1(current, spectra, HdB, IR, gamma2)
                 else:
-                    current_max_val = max(abs(current))
-                    # Show clipping
-                if current_max_val >= args.aiRange:
-                    pen = (255, 0, 0, 130)
-                    clipped = True
-                elif not clipped:
-                    pen = (200, 200, 200, 130)
-                else:
-                    pen = (255, 127, 80, 130)
-
-                   # Plotting
-                for i in range(0, numPlots, 6):
-                    if numPlots > 1:
-                        curve[i].setData(tVec, current[0,:], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+1].setData(tVec, current[1,:], pen=pen, antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+2].setData(fftfreq, gz.amp2db(spectra[0, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+3].setData(fftfreq, gz.amp2db(spectra[1, 0:int(bufferSize//2)]), antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+4].setData(fftfreq, HdB[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+5].setData(tVec, IR.real[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                        curve[i+6].setData(fftfreq, gamma2[1, ...], antialias=True, downsample=downsample, downsampleMethod='subsample')
-                    else:
-                        curve[i].setData(current, pen=pen, antialias=True, downsample=downsample, downsampleMethod='subsample')
-                    pg.QtGui.QApplication.processEvents()
+                    if 'live' in args.plotting: live_Plot.livePlotUpdate(current)
 
                 timeCounter += bufferSize
                 pbar_ai.update(bufferSize)
             pbar_ai.close()
         elif idx_ao:
             time.sleep(sim_time)
+
     # Updating the dictionary with the measured data
     ch_count = 0
     for idx, device_idx in enumerate(idx_ai):
         if number_of_channels_in[idx] == 0 or idx_ai == []:
             continue
         for ch_num in range(number_of_channels_in[idx]):
-            values_read_filt = filters.filters(np.array(values_read[ch_count, :]), args.sampleRate).butter_bandpass_filter(5,args.sampleRate/2.56)
-            measurements.update({(channel_list[device_idx]['ai'][ch_num]): values_read_filt})
+            measurements.update({(channel_list[device_idx]['ai'][ch_num]): values_read[ch_count, :]})
             ch_count += 1
 
-    if number_of_channels_in[0] >= 2:
+    if 'noise' in signal_type and number_of_channels_in[0] == 2:
+        #Time and frequency vectors
+        tVec = np.linspace(0, bufferSize / sample_rate, bufferSize)
+        fftfreq = np.fft.rfftfreq(bufferSize, 1 / sample_rate)
+        fftfreq = fftfreq[:-1]
+
         measurements.update({"Hij": H, "HdBij": HdB, "H_phase_ij": H_phase, "IRij": IR, "gamma2ij": gamma2, "fftfreq": fftfreq, "tVec": tVec})
 
     return measurements

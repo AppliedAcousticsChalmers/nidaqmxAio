@@ -11,6 +11,7 @@ from tqdm import tqdm
 import utils as gz
 import TFestimation as TF
 import filters as fl
+import plotting as myplt
 
 
 def mic_calibration(measurements, sensitivity):
@@ -25,7 +26,8 @@ def mic_calibration(measurements, sensitivity):
 
     return calibration
 
-def TFcalc(filename, blockSize, calibrationData):
+def TFcalc(filename, blockSize, calibrationData, plotting):
+    print("Transfer function estimation")
 
     # Reading the configuration
     print("Importing raw data... ", end="")
@@ -38,30 +40,47 @@ def TFcalc(filename, blockSize, calibrationData):
     blockSize = int(blockSize)  # is gonna be handled as a command line input
     signalUnpadded = measurements["Unpadded_signal"]
     signalType = measurements["Signal"]
-    # Initial calculations
+
+    # Locate the part of the file containing the measured data
     keys = list(measurements.keys())
     dataCH = [i1 for i1, s1 in enumerate(keys) if "cDAQ" in s1]
     firstCH = dataCH[0]
     lastCH = dataCH[-1]
     keys = keys[firstCH:lastCH+1]
+    # Locate the reference channel or ask for user input if none is given
+    if measurements['Reference_channel'] == 'none':
+        print("Please select which channel should be used as reference in post processing. (pressing enter will default to the first channel in the list)")
+        idx = 0
+        for name in keys:
+            print('[' + str(idx) + '] ' + name)
+            idx += 1
+        selection = input()
+        if not selection: selection = 0
+        measurements['Reference_channel'] = keys[int(selection)]
     refCH = [i2 for i2, s2 in enumerate(keys) if measurements['Reference_channel'] in s2][0]
+
+    # Store the measured data into an array and count the total number of channels
     values = list(measurements.values())
     data = np.array(values[firstCH:lastCH+1])
     nCHin = int(len(data))
     print("Completed")
 
     # Removing the zero padding of the signal
-    if simTime < 5 or "sweep" in signalType[0]:
-        print("Removing the zero padding of the signal (This will take a while)... ", end="")
-        convxymin = np.convolve((data[int(refCH), ...]), np.flipud(signalUnpadded), 'valid')
-        convxymax = np.convolve(np.flipud(data[int(refCH), ...]), signalUnpadded, 'valid')
+    # if simTime < 5 or ("sweep" in signalType[0]):
+        # print("Removing the zero padding of the signal (This will take a while)... ", end="")
+        # convxymin = np.convolve((data[int(refCH), ...]), np.flipud(signalUnpadded), 'valid')
+        # convxymax = np.convolve(np.flipud(data[int(refCH), ...]), signalUnpadded, 'valid')
 
-        pad_start = np.argmax(convxymin)
-        pad_end = np.argmax(convxymax)
-        data = data[..., pad_start:-pad_end]
-        print("Completed")
+        # pad_start = np.argmax(convxymin)
+        # pad_end = np.argmax(convxymax)
+        # data = data[..., pad_start:]
+        # data = data[..., pad_start:-pad_end]
+        # print("Completed")
 
-    if "noise" in signalType:
+
+    # Calculating the TF for Noise signals
+    if ("noise" in signalType[0]):
+
         # Zeropadding
         numberOfsamples = int(len(data[0]))
         print("Zeropadding... ", end="")
@@ -72,19 +91,20 @@ def TFcalc(filename, blockSize, calibrationData):
         print("Completed")
         print("Signal padded with %i zeros at the end" % zeropad)
 
-
-        # Arranging the data into blocks, Applying window and calculating the fft
+        # Arranging the data into blocks
         print("Arranging the data into blocks")
         for chidx in range(nCHin):
+            print(np.shape(data))
             i0 = 0
             pbar1 = tqdm(total=nBlocks)
             for idx in range(nBlocks):
                 # Arranging into blocks
-                dataMatrix[chidx, :, idx] = data[chidx, i0:i0+blockSize] #* win
+                dataMatrix[chidx, :, idx] = data[chidx, i0:i0+blockSize]
                 i0 += blockSize
                 pbar1.update()
             pbar1.close()
 
+        # Calculations using the H1 estimator
         blockidx = 0
         current_buffer = np.zeros((nCHin, int(blockSize)))
         previous_buffer = np.zeros((nCHin, int(blockSize)))
@@ -96,14 +116,17 @@ def TFcalc(filename, blockSize, calibrationData):
             pbar2.update()
         pbar2.close()
 
+        # Saving the data
         print("Saving the processed data... ", end="")
         fftfreq = np.fft.rfftfreq(blockSize, 1 / sr)
         tVec = np.linspace(0, len(IR[0, :]) / sr, len(IR[0, :]))
         measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "gamma2ij": gamma2, "fftfreq": fftfreq, "tVec": tVec})
         print("Completed")
 
-    elif "sweep" in signalType[0]:
-        #Determining the start and stop frequencies of the signal
+    # Calculating the TF for Sweep signal
+    elif ("sweep" in signalType[0]):
+
+        # Determining the start and stop frequencies of the signal
         f0 = int(signalType[1])
         f1 = int(signalType[2])
         print("Starting frequency f0 = %i Hz" % f0 )
@@ -111,70 +134,56 @@ def TFcalc(filename, blockSize, calibrationData):
 
         #Main calculations
         print("Processing the data...", end="")
-        H, HD, HdB, H_phase, IR, fftfreq, tVec = TF.deconvolution(data, sr, calibrationData, micAmp, refCH, f0, f1)
+        H, HD, HdB, H_phase, IR, fftfreq, tVec, spectrogramm = TF.deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1)
         print("Completed")
 
-        #Saving the data
+        # Saving the data
         print("Saving the processed data... ", end="")
-        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "fftfreq": fftfreq, "tVec": tVec})
+        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "H_phase":H_phase, "fftfreq": fftfreq, "tVec": tVec})
         print("Completed")
 
-    for pltidx in range(nCHin):
-        if pltidx == refCH:
-            continue
-        plot1y = HdB[pltidx, :]
-        if "noise" in signalType: plot2y = gamma2[pltidx, :]
-        plot3y = IR.real[pltidx, :]
-        plot4y = H_phase[pltidx, :]
-        freqs = fftfreq[:-1]
-        tvec = tVec
 
-    #     ax1.set_ylabel(r"$H1_{[%i,%i]}$ in dB"%(refCH[0],pltidx))
-        trace1 = go.Scatter(
-            x=freqs,
-            y=plot1y,
-            name='$H_{[%i,%i]}$ in dB' % (refCH, pltidx)
-        )
+    # Plotting
+    if 'TF' in plotting:
+        for pltidx in range(nCHin):
+            if pltidx == refCH:
+                continue
+            if ("noise" in signalType[0]):
+                plots = {'TF':[fftfreq[:-1], HdB[pltidx, :]],
+                         'gamma2':[fftfreq[-1], gamma2[pltidx, :]],
+                         'IR':[tVec, IR.real[pltidx, :]],
+                         'phase':[fftfreq[-1], H_phase[pltidx, :]]}
+            elif ("sweep" in signalType[0]):
+                plots = {'TF':[fftfreq[:-1], HdB[pltidx, :]],
+                         'spectrogram':[spectrogramm[pltidx][1], spectrogramm[pltidx][0],spectrogramm[pltidx][2]],
+                         'IR':[tVec, IR.real[pltidx, :]],
+                         'phase':[fftfreq[-1], H_phase[pltidx, :]]}
 
-        if "noise" in signalType:
-           trace2 = go.Scatter(
-               x=freqs,
-               y=plot2y,
-               name='$\\gamma^2_{[%i,%i]}$' % (refCH, pltidx)
-           )
+            myplt.irSubPlot(plots, filename + "_" + str(pltidx), "Channel: " + keys[pltidx])
 
-        trace3 = go.Scatter(
-            x=tvec,
-            y=plot3y,
-            name='$\\text{IR}_{[%i,%i]}$' % (refCH, pltidx)
-        )
+    # Time signals plotting
+    if 'timeSig' in plotting:
+        time_signals_plot = {'xAxisTitle': 'time in s',
+                             'yAxisTitle': 'Amplitude',
+                             'plotTitle':  filename + '_time_signals',
+                             'scale':'lin'}
 
-        trace4 = go.Scatter(
-            x=freqs,
-            y=plot4y,
-            name='$Phase_{H,[%i,%i]}$' % (refCH, pltidx)
-        )
+        full_tVec = np.linspace(0,simTime, int(len(data[0])))
+        time_signals = data
+        time_signals[:refCH, :] = (data[:refCH, :] / micAmp) * calibrationData[0]
+        time_signals[refCH+1:, :] = (data[refCH+1:, :] / micAmp) * calibrationData[0]
 
-        fig = tools.make_subplots(rows=2, cols=2, subplot_titles=('HdB', 'gamma2', 'IR', 'H_phase'))
+        for idx in range(nCHin):
+            time_signals_plot.update({str(idx):[full_tVec, time_signals[idx,:],"Channel:" + keys[idx]]})
 
-        fig.append_trace(trace1, 1, 1)
-        if "noise" in signalType: fig.append_trace(trace2, 1, 2)
-        fig.append_trace(trace3, 2, 1)
-        fig.append_trace(trace4, 2, 2)
+        myplt.singlePlot(time_signals_plot)
 
-        fig['layout'].update(title=filename,
-                             xaxis1=dict(title='frequency in Hz', type='log', autorange=True),
-                             xaxis2=dict(title='frequency in Hz', type='log', autorange=True),
-                             xaxis3=dict(title='time in s', type='lin', autorange=True),
-                             xaxis4=dict(title='frequency in Hz', type='log', autorange=True)
-                             )
-        py.plot(fig, filename=filename + '.html')
     print("Process Finished")
 
     return measuredFRFs
 
 
-def T60Shroeder(filename, blockSize, calibrationData):
+def T60Shroeder(filename, blockSize, calibrationData, plotting):
     """Calculates the T_60 values in the bandwidth specified, using Schroeder's
        backwards intergration method.
 
@@ -184,10 +193,9 @@ def T60Shroeder(filename, blockSize, calibrationData):
 
        """
     # Calculating the IR
-    print("Estimating the IR...", end="")
-    measurements = TFcalc(filename, blockSize, calibrationData)
-    print("Completed")
+    measurements = TFcalc(filename, blockSize, calibrationData, plotting)
 
+    print("T60 Estimation")
     #Importing the required data
     print("Importing the required data... ", end="")
     sr = measurements["SampleRate"]
@@ -207,14 +215,29 @@ def T60Shroeder(filename, blockSize, calibrationData):
     IR = np.delete(IR, (refCH), axis=0)
     print("completed")
 
-    print("Converting IR into 3rd octave bands")
-    IR_3rd, fvec_3rd = fl.filters(IR,sr).band_filter(20,sr / 2.56,"third")
-    IR_3rd = np.array(IR_3rd)[:,0,:]
+    #Removing the source - rec distance
+    print("Removing source - receiver distance...", end="")
+    # for idx in range(0, len(IR)):
+    IR_head, IR_tail = fl.filters(IR[0,:], sr).removeDelay()
+
+    IR_headVEC = np.array(range(0,len(IR_head)))
+    IR_tailVEC = len(IR_head) + np.array(range(0,len(IR_tail)))
+    print("completed")
+
+
+    print("Converting IR into 3rd octave bands...", end="")
+    IR_3rd, fvec_3rd = fl.filters(IR_tail,sr).band_filter(20,sr / 2.56,"third")
+    IR_3rd = np.array(IR_3rd)
+    print("completed")
+
     T_60 = []
     T_30 = []
+    print("Calculating T60 for each band")
+    pbar1 = tqdm(total=len(IR_3rd-1))
     for idx in range(0,len(IR_3rd-1)):
 
         IR_current = IR_3rd.real[idx,:]
+
         #Finding the analytical signal and taking it's envelope through the hilbert transform
         s_anal = hilbert(IR_current)
         envelope =  abs(s_anal)
@@ -252,61 +275,53 @@ def T60Shroeder(filename, blockSize, calibrationData):
         T_30.append(t_35dB - t_5dB)
 
 
-        # #Plotting
-        # plot1y = fl.amp2dB(IR_current)
-        # plot2y = fl.amp2dB(envelope)
-        # plot3y = fl.amp2dB(moav)
-        # plot4y = fl.amp2dB(Rev_int)
-        # plot5y = xr
-        # plot6y = x_5dB
-        # plot7y = x_35dB
 
-        # trace1 = go.Scatter(
-        #     x = tVec,
-        #     y = plot1y,
-        #     name='IR at %i Hz ' % (fvec_3rd[idx]),
-        #     text = ['T_60 %i' % (T_60[idx])],
-        #     textposition='bottom'
-        # )
+    # #Plotting
 
-        # trace2 = go.Scatter(
-        #     x=tVec,
-        #     y=plot2y,
-        #     name='envelope %i Hz' % (fvec_3rd[idx])
-        # )
+        # Scroeder one band
+        plot1y = fl.amp2dB(IR_current)
+        plot2y = fl.amp2dB(envelope)
+        plot3y = fl.amp2dB(moav)
+        plot4y = fl.amp2dB(Rev_int)
+        plot5y = xr
+        plot6y = x_5dB
+        plot7y = x_35dB
+        plots2 = {'0':[tVec,plot1y,'Impulse Responce at %i Hz 3rd octave band: ' % (fvec_3rd[idx]) ],
+             '1':[tVec,plot2y,'Envelope'],
+             '2':[tVec,plot3y,'Moving average filter'],
+             '3':[tVec,plot4y,'Schroeder curver'],
+             '4':[tVec,plot5y,'Linear fit'],
+             '5':[tVec,plot6y,'-5dB'],
+             '6':[tVec,plot7y,'-35dB'],
+             'xAxisTitle': 'time in s',
+             'yAxisTitle': 'Amplitude',
+             'plotTitle': filename + "_@_" + str(fvec_3rd[idx]),
+             'scale':'lin'}
 
-        # trace3 = go.Scatter(
-        #     x=tVec,
-        #     y=plot3y,
-        #     name='moav %i Hz' % (fvec_3rd[idx])
-        # )
+        if 'T60_one_band' in plotting: myplt.singlePlot(plots2)
 
-        # trace4 = go.Scatter(
-        #     x=tVec,
-        #     y=plot4y,
-        #     name='Rev intH %i Hz' % (fvec_3rd[idx])
-        # )
+        pbar1.update()
+    pbar1.close()
 
-        # trace5 = go.Scatter(
-        #     x=tVec,
-        #     y=plot5y,
-        #     name='fit %i Hz' % (fvec_3rd[idx])
-        # )
+    # Source - Receiver removal
+    plots = {'0':[np.array(len(IR[0,:])),IR.real[0,:],'Impulse Responce'],
+             '1':[IR_headVEC,IR_head.real,'head'],
+             '2':[IR_tailVEC,IR_tail.real,'tail'],
+             'xAxisTitle': 'time in s',
+             'yAxisTitle': 'Amplitude',
+             'plotTitle': 'initial delay removal',
+             'scale':'lin'}
 
-        # trace6 = go.Scatter(
-        #     x=tVec,
-        #     y=plot6y,
-        #     name='-5dB'
-        # )
+    if 'T60_SRR' in plotting: myplt.singlePlot(plots)
 
-        # trace7 = go.Scatter(
-        #     x=tVec,
-        #     y=plot7y,
-        #     name='-35dB'
-        # )
-        # data = [trace1, trace2, trace4]#, trace3, trace5, trace6, trace7]
-        # py.plot(data, filename=filename + '.html')
+    # T60 final
+    plots3 = {'0': [fvec_3rd,T_60,"T60"],
+              'xAxisTitle': 'frequency in Hz',
+              'yAxisTitle': 'time in s',
+              'plotTitle': filename + "T_60",
+              'scale':'log'}
 
+    if 'T60_3rd' in plotting: myplt.singlePlot(plots3)
     #Saving the data
     RT = {'T60Schroeder': T_60, 'T30Schroeder': T_30, 'fVec_3rd': fvec_3rd}
 

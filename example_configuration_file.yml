@@ -1,0 +1,63 @@
+#This is a comment. Example uses in the end
+
+# Required arguements
+time: 30          	#In seconds
+sampleRate: 48000    	#in samples per second
+newMeasurement: 0 	# 0 - False, 1 - True
+
+# Optional arguements
+signalType: [noise_white]
+pad_samples: 8192 	
+channelsIn: [2] 	
+channelsOut: [2]
+aiRange: 5		#In volts peak
+aoRange: 0.4		#In volts peak
+save_file: my_measurement
+bufferSize: 32768
+calibration: my_calibration_file
+micAmp: 1
+sensitivity: 47.1	#In mV/Pa
+postProcess: TF
+cutoffTime: 2		#In seconds
+plotting: [live, TF]
+
+
+
+# Exapmles of parameter usage. 
+# If an optional argument is not specyfied the default is used.
+
+
+# For 2 inputs 2 outputs, with one input and one output module
+# pressent
+
+#channelsIn: [2]
+#cahnnelsOut:[2]
+
+# For 2 inputs 2 outputs, with two input and one output module
+# pressent
+
+#channelsIn: [2, 0]
+#cahnnelsOut:[2]
+
+# For 5 inputs 2 outputs, with two input and one output module
+# pressent, using the first 3 channels of the first module and
+# the first 2 of the second module
+
+#channelsIn: [3, 2]
+#cahnnelsOut:[2] 
+
+# Sinusoidal at 100 Hz
+#signalType: [tone, 100]
+
+# Linear sweep from 5 to 500 Hz
+#signalType: [sweep_linear, 5, 500]
+
+# Logarithmic sweep from 5 to 500 Hz
+#signalType: [sweep_logarithmic, 5, 500]
+
+# White noise
+#signalType: [noise_white]
+
+# Pink noise
+#signalType: [noise_pink]
+

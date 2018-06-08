@@ -1,6 +1,7 @@
 #Python libraries
 
 argparse
+configargparse
 numpy
 scipy
 colorednoise

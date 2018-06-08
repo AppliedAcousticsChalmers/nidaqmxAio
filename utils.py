@@ -5,7 +5,6 @@ from scipy.signal import butter, lfilter, filtfilt
 from collections.abc import Mapping
 import time
 import os, errno
-# from scipy.interpolate import interp1d
 import warnings
 
 
@@ -66,6 +65,15 @@ def dbadd(*args):
         db_sum += 10.0 ** (db / 10.0)
     db_sum = 10.0 * np.log10(db_sum)
     return db_sum
+
+def dbavg(*args):
+    db_avg = 0
+    for i in args:
+        db = np.asanyarray(i)
+        db_avg += 10.0 ** (db / 10.0)
+        db_avg /= len(args)
+    db_avg = 10.0 * np.log10(db_avg)
+    return db_avg
 
 
 def dbsingle(dbspectrum):

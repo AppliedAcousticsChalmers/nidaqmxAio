@@ -1,7 +1,7 @@
 import numpy as np
 import utils as gz
 from scipy.optimize import curve_fit
-from scipy.signal import butter, lfilter, filtfilt
+from scipy.signal import butter, lfilter, filtfilt, sosfiltfilt, sosfilt
 
 class filters(object):
 
@@ -44,6 +44,8 @@ class filters(object):
         self.sr = sr
         self.centerFreqs = []
 
+        return
+
     def band_filter(self, f_min, f_max, bandWidth = "third"):
         if f_min > f_max: raise RuntimeError("Minimum frequency greater than maximum frequency")
         if bandWidth == "third":
@@ -68,23 +70,41 @@ class filters(object):
 
         return self.output, self.centerFreqs
 
-    def butter_bandpass(self, f_low, f_high):
+    def change_order(self, order):
+        self.filter_order = order
+
+        return
+
+    def butter_bandpass(self, f_low, f_high, order=2):
         '''Creates the coeficients for a butterworth bandpass filter'''
         nyq = 0.5 * self.sr
         low = f_low / nyq
         high = f_high / nyq
-        b, a = butter(self.filter_order, [low, high], btype='band')
+        if order == 2:
+            b, a = butter(self.filter_order, [low, high], btype='band')
 
-        return b, a
+            return b, a
+        else:
+            sos = butter(self.filter_order, [low, high], btype='band', output='sos')
+
+            return sos
 
 
-    def butter_bandpass_filter(self, f_low, f_high):
+    def butter_bandpass_filter(self, f_low, f_high, order=2):
         '''Filters a signal using the filter created by butter_bandpass method'''
-        b, a = self.butter_bandpass(f_low, f_high)
-        # y = lfilter(b, a, data)
-        y = filtfilt(b, a, self.data)
+        if order == 2:
+            b, a = self.butter_bandpass(f_low, f_high, order)
+            # y = lfilter(b, a, self.data)
+            y = filtfilt(b, a, self.data)
 
-        return y
+            return y
+        else:
+            sos = self.butter_bandpass(f_low, f_high, order)
+            # y = sosfilt(sos, self.data)
+            y = sosfiltfilt(sos, self.data)
+
+            return y
+
 
     def removeDelay(self):
         IR_a = gz.a_weighting(self.data, self.sr)
@@ -134,7 +154,7 @@ def findTau(data, tVec, threshold):
     the exponential decay has ended.
 
     It is assumed that the data are sufficiently smooth (using band filtering,
-    Hilbert transform and mocing average filters) and converted to dB using the
+    Hilbert transform and moving average filters) and converted to dB using the
     method amp2dB.
 
     It is also assumed that the data consist of two parts. An exponential decay
@@ -200,7 +220,7 @@ def smooth(x,window_len=11,window='hanning'):
         if window == 'flat': #moving average
             w=np.ones(window_len,'d')
         else:
-            w=eval('numpy.'+window+'(window_len)')
+            w=eval('np.'+window+'(window_len)')
 
         y=np.convolve(w/w.sum(),s,mode='valid')
 

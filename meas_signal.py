@@ -4,13 +4,15 @@ from scipy import signal
 
 
 def half_hann(f, sr, side):
-    win_samples = int(sr / f / 4)
+    win_samples = int(512)
+    # win_samples = int(sr / f / 4)
     T = win_samples / sr
-    tvec = np.linspace(0, T, win_samples)
+    tvec = np.linspace(0, np.pi/2, win_samples)
+    # tvec = np.linspace(0, T, win_samples)
     if side == 'right':
-        win = np.cos(f * 2 * np.pi * tvec)**2
+        win = np.cos(tvec)**2
     elif side == 'left':
-        win = np.sin(f * 2 * np.pi * tvec)**2
+        win = np.sin(tvec)**2
     return win
 
 
@@ -47,10 +49,10 @@ def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage
         signal_unpadded[-len(win_right):] *= win_right
         signal_unpadded[:len(win_right)] *= win_left
     elif sig[0] == "tone":
-        f = int(signal_type[1])
+        f = float(signal_type[1])
         win_right = half_hann(f, sample_rate, 'right')
         win_left = half_hann(f, sample_rate, 'left')
-        signal_unpadded = np.sin(f * 2 * np.pi * time_vector)
+        signal_unpadded = np.sin(float(f) * 2 * np.pi * time_vector)
         signal_unpadded[-len(win_right):] *= win_right
         signal_unpadded[:len(win_right)] *= win_left
     elif sig[0] == "sweep":

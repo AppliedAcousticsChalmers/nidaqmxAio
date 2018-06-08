@@ -89,7 +89,6 @@ def file_save(data, filename, directory, extention=[], options=[]):
         # MatLab directory creation and export file
         matsave = saveToMat(data)
         mat_directory = directory + "\\" + directory.rsplit('\\', 1)[1].rsplit('.', 1)[0] + "_" + "matLab"
-        # mat_directory = directory + "\\" + directory + "-matLab"
         create_dir(mat_directory)
         mat_filename = mat_directory + "\\" + filename + "_" + currentDTime
         sio.savemat(mat_filename, {"object": matsave})
@@ -106,10 +105,10 @@ def file_save(data, filename, directory, extention=[], options=[]):
         create_dir(directory)
         mat_directory = directory + "\\matLab_" + extention
         create_dir(mat_directory)
-        filename = directory + "\\" + filename.rsplit('\\', 1)[1].rsplit('.', 1)[0] + "_" + extention + "_" + currentDTime
-        mat_filename = mat_directory + "\\" + filename.rsplit('\\', 1)[1].rsplit('.', 1)[0] + "_" + extention + "_" + currentDTime
-        np.save(filename, data)
+        filename_out = directory + "\\" + filename.rsplit('\\', 1)[1].rsplit('.', 1)[0] + "_" + extention + "_" + currentDTime
+        mat_filename_out = mat_directory + "\\" + filename.rsplit('\\', 1)[1].rsplit('.', 1)[0] + "_" + extention + "_" + currentDTime
+        np.save(filename_out, data)
         matsave = saveToMat(data)
-        sio.savemat(mat_filename, {"object": matsave})
+        sio.savemat(mat_filename_out, {"object": matsave})
 
         return
