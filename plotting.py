@@ -159,7 +159,7 @@ class livePlot(object):
 
     '''
 
-    def __init__(self, args, bufferSize, sample_rate, selection, channelNames):
+    def __init__(self, args, number_of_channels_in, bufferSize, sample_rate, selection, channelNames):
         '''
         Method initialazes the plotting object.
 
@@ -177,7 +177,7 @@ class livePlot(object):
 
         #Initial arguements
         self.args = args
-        self.number_of_channels = sum(self.args.channelsIn)
+        self.number_of_channels = sum(number_of_channels_in)
         self.bufferSize = bufferSize
         self.sample_rate = sample_rate
         self.selection = selection

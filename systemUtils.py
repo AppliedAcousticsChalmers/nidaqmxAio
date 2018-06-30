@@ -101,7 +101,7 @@ def file_save(data, filename, directory, extention=[], options=[]):
     # PostProcess scripts
     else:
         # Directory creation
-        directory += extention + "\\"
+        directory += currentDay + "\\" + extention + "\\"
         create_dir(directory)
         mat_directory = directory + "\\matLab_" + extention
         create_dir(mat_directory)

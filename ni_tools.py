@@ -155,7 +155,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
 
         # Initialization
 
-        if 'live' in args.plotting:live_Plot = myPlt.livePlot(args, bufferSize, sample_rate, selection, chSelect)
+        if 'live' in args.plotting:live_Plot = myPlt.livePlot(args, number_of_channels_in, bufferSize, sample_rate, selection, chSelect)
 
         timeCounter = 0
         blockidx = 0

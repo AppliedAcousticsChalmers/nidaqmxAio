@@ -1,20 +1,17 @@
-time: 60
-sampleRate: 48000
+time: 15
+sampleRate: 5000
 newMeasurement: 1
 channelsIn: [2]
 channelsOut: [2]
-signalType: ['noise_white']
 
-signalType: [noise_white]
+signalType: [sweep_linear, 5, 500]
 pad_samples: 8192 	
-channelsIn: [2] 	
-channelsOut: [2]
 aiRange: 5		
-aoRange: 0.4		
+aoRange: 0.2		
 save_file: my_measurement
-bufferSize: 32768
-calibration: my_calibration_file
-micAmp: 1
+bufferSize: 4096
+calibration: room_b_ls
+micAmp: 10
 sensitivity: 47.1	
 postProcess: TF
 cutoffTime: 2		

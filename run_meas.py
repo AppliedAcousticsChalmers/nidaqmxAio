@@ -81,7 +81,8 @@ if __name__ == '__main__':
             print(selected_diretory)
             filenames = sy.file_select(selected_diretory)
         else:
-            selected_diretory = filenames.rsplit('-',1)[0] + "_"
+            selected_diretory = meas_directory
+            # selected_diretory = filenames.rsplit('_',1)[0] + "_"
             filenames = [filenames + ".npy"]
         # Setting up the initial parameters
         for current_file in filenames:
