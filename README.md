@@ -5,7 +5,7 @@ Input/output acquisition automation using the [nidaqmx](https://github.com/ni/ni
 ### Prerequisites
 
 You need to be able to run python scripts on your system with version >3.6 installed. nidaqmx supports only Windows OS.
-Python prerequisites found in `requirements.txt`. To install them, run `pip install -r requirements.txt`.
+Python prerequisites found in `requirements.txt`.
 
 ### Usage
 Run `python run_meas.py -c <configuration_file_name.yml` to run using the specified configuration file. An example configuration file is provided.
@@ -14,13 +14,13 @@ or
 
 Run `python run_meas.py <simulation time> <sample rate>` `<new meassurement>` with additional arguments for channel input/outputs. If `--newMeasurement` is set to `1` a new measurement is going to take place (default `0`).
 
-The script is built without external triggering/clocking devices in mind. Due to system delays that cannot be deterministically calculated, the test signals are zero padded to avoid truncated ends. Type `python run_meas.py --help` for information on the additional arguments. Measurements are saved in the directory `acquired_data\measurements_<YYMMDD>\` in the format `meas_<YYMMDD>.py` by specifying the desired filename, using `-sv filename`. During measurements, a live post-processing preview is displayed, presenting the spectra of reference and measured channel, transfer function (using the H1 estimator), impulse response and coherence. In case the H1 estimator calculation is not possible, the corresponding time signals are displayed. The reference channel can be selected from a list after running the script (leave blank to select the first channel on the list). The option for no reference channel is also available. 
+The script is built without external triggering/clocking devices in mind and therefore only specific sample rates can be used(refer to the NI cDAQ modules manuals for more information). Due to system delays that cannot be deterministically calculated, the test signals are zero padded to avoid truncated ends. Type `python run_meas.py --help` for information on the additional arguments. Measurements are saved in the directory `acquired_data\measurements_<YYMMDD>\` in the format `meas_<YYMMDD>.py` by specifying the desired filename, using `-sv filename`. During measurements, a live post-processing preview is displayed, presenting the spectra of reference and measured channel, transfer function (using the H1 estimator), impulse response and coherence. In case the H1 estimator calculation is not possible, the corresponding time signals are displayed. The reference channel can be selected from a list after running the script (leave blank to select the first channel on the list). The option for no reference channel is also available. 
 
 #### Input arguments
 
 If you need to run the script with other than the default values, specify the corresponding arguments explicitly.
 
-`-sig <string>` or `--signalType <string>`:
+`-sig <string> <float> <float>` or `--signalType <string> <float> <float>`:
 The type of the output signal to be generated. Currently, `[noise_white]`, `[noise_pink]`, `[sweep_linear, f0, f1]`, `[sweep_logarithmic, f0, f1]` and `[tone, f0]`  are supported (default: `pink_noise`). The values `f0`, `f1` correspond to the starting and stopping frequecy of the sweep repsectivelly. In the case of the tone signal `f0` corresponds to the frequency of the signal.
 
 `-pad <int>` or `--pad_samples <int>`:
@@ -56,20 +56,24 @@ Specifies the filename of the calibration data file. If it's not present ask if 
 `-pp <string>` or `--postProcess <string>`:
 Run the chosen post processing script. You will be asked to select the directory and a the file from a list (typing `all` will cause the script to run for all the files in the selected directory with the file extension`.np[yz]`, except the calibration files). Results will be saved as `<measurement_name>_TFs`. Current choices:
 `TF` - Estimates the transfer function using the H1 estimator, or the deconvolution method. The correct method is chosen automatically depending on the signal type used in the measurement.
-`T60Schr` - Estimates the reverberation time using the back-wards integration method. This script always causes the `TF` postporssesing script to run in order to calculate the impulse response using the desired calibration data and block size.
+`RAC` - Estimates the reverberation time using the back-wards integration method. This script always causes the `TF` postporssesing script to run in order to calculate the impulse response using the desired calibration data and block size.
 
 `-cT <int>` or `--cutoffTime <int>`:
  Causes the algorithm to keep measuring for the specified amount of seconds after the output has stopped. (default: `0`)
  
- `-plt <string> <string> ...` or `--plotting <string> <string> ...`:
+`-plt <string> <string> ...` or `--plotting <string> <string> ...`:
   Causes the algorithm to output the specified plots, if the corresponding script is run. Current choices:
   `live` - Plots live, the time signals or processed data during the data acquisition.
   `TF` - Plots the transfer function, coherence/spectrogram (depending on the method), impulse response and phase, when the `TF` postprossesing script is run.
-  `timeSig` - Plots the raw time signals, when the `TF` post processing script is run.
-  `T60_one_band` - Plots each step of the back-wards integration method for each octave band calculated, when the `T60Schr` script is run.
-  `T60_3rd` - Plots the T60 in 3rd octave bands, when the `T60Schr` script is run.
+  `timeSig` - Plots the raw time signals, when the measurement script is run.
+  `T60_one_band` - Plots each step of the back-wards integration method for each octave band calculated, when the `RAC` script is run.
+  `T60_3rd` - Plots the T60 in 3rd octave bands, when the `RAC` script is run.
+  
+`-fRange <float> <float> <string>` or `--frequencyRange <float> <float> <string>`:
+ Sets the frequency range for the `RAC` script. The format is a list as - [lowest frequency band, highest frequency band, bandwidth]. Bandwidth can be set to `'third'` or `'one'` for third and one octave bands respectively (default: `[20, 10000, 'third']`).
 
-
-### TODO
-
-* fix plotly compatibility with LaTeX interpreter 
+`-refCH <float>` or `--refferenceChannel <float>`: 
+ Presets the channel that is going to be used as reference, bypassing the command line dialog, when the measurement script is run (default=`'"""'`).
+ 
+ `-cmt <string>` or `--comment <string>`:
+ Saves a text comment on the output file (default=`""`). 

@@ -5,6 +5,7 @@ from plotly import tools
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 
+#Program libraries
 import utils as gz
 
 
@@ -16,7 +17,8 @@ def singlePlot(plots):
     plots = {'0':[tVec,IR.real[1,:],'Impulse Responce'],
               'xAxisTitle': 'frequency in Hz',
               'yAxisTitle': 'H',
-              'plotTitle': 'Plot title'}
+              'plotTitle': 'Plot title',
+              'scale':'lin' or 'log;}
 
     The each line of data should be registered to a key,
     named '0', '1', etc. The data assigned to the key should
@@ -49,6 +51,107 @@ def singlePlot(plots):
     py.plot(fig, filename=plots['plotTitle'] + '.html')
 
     return
+
+def singlePlot_CI(plots):
+    """
+    Outputs a signle plot with arbitary many lines of data,
+    with their respective confidence intervals
+    The data should be given in a dictionary formated as:
+
+    plots = {'0':[tVec, mean, lower CI, upper CI, 'Impulse Responce','bar' or 'scatter'],
+              'xAxisTitle': 'frequency in Hz',
+              'yAxisTitle': 'H',
+              'plotTitle': 'Plot title',
+              'scale': 'lin' or 'log' or 'category' (for equally spaced bar plots)}
+
+    The each line of data should be registered to a key,
+    named '0', '1', etc. The data assigned to the key should
+    be a list in the form:
+    [x axis data, y axis data, legend name]
+
+    The last three keys refer to the tittles of the x,y axis
+    and the title of the plot respectivelly.
+    """
+
+
+    trace = []
+    for idx in range(0, len(plots.keys())-4):
+        if plots[str(idx)][5] == 'bar':
+            trace.append(go.Bar(
+                x = plots[str(idx)][0],
+                y = plots[str(idx)][1],
+                name = plots[str(idx)][4],
+                error_y = dict(
+                    type = 'data',
+                    symmetric=False,
+                    array = plots[str(idx)][3],
+                    arrayminus = plots[str(idx)][2]
+                )
+            ))
+        else:
+            trace.append(go.Scatter(
+            x = plots[str(idx)][0],
+            y = plots[str(idx)][1],
+            name = plots[str(idx)][4],
+            mode = plots[str(idx)][5],
+            error_y = dict(
+                type = 'data',
+                symmetric=False,
+                array = plots[str(idx)][3],
+                arrayminus = plots[str(idx)][2]
+                )
+        ))
+
+    layout = go.Layout(
+        title=plots['plotTitle'],
+        xaxis=dict(
+        title=plots['xAxisTitle'],
+        type=plots['scale'],
+        autorange=True
+        ),
+        yaxis=dict(
+        title=plots['yAxisTitle'],
+        # range= [0, 0.06]
+        )
+    )
+    fig = go.Figure(data=trace, layout=layout)
+    py.plot(fig, filename=plots['plotTitle'] + '.html')
+
+    return
+
+def polarPlot(plots):
+    """
+    Outputs a signle plot with arbitary many lines of data.
+    The data should be given in a dictionary formated as:
+
+    plots = {'0':[theta, data, 'Impulse Responce','markers' or 'lines'],
+              'plotTitle': 'Plot title'}
+
+    The each line of data should be registered to a key,
+    named '0', '1', etc. The data assigned to the key should
+    be a list in the form:
+    [x axis data, y axis data, legend name]
+
+    The last key refers to the tittle of the plot.
+    """
+
+
+    trace = []
+    for idx in range(0, len(plots.keys())-1):
+        trace.append(go.Scatterpolar(
+            theta = plots[str(idx)][0],
+            r = plots[str(idx)][1],
+            name = plots[str(idx)][2],
+            mode = plots[str(idx)][3]
+            ))
+    layout = go.Layout(
+        title=plots['plotTitle']
+        )
+    fig = go.Figure(data=trace, layout=layout)
+    py.plot(fig, filename=plots['plotTitle'] + '.html')
+
+    return
+
 
 def irSubPlot(plots, filename, title):
     """
@@ -194,7 +297,7 @@ class livePlot(object):
         #Time and frequency vectors
         self.tVec = np.linspace(0, self.bufferSize / self.sample_rate, self.bufferSize)
         self.fftfreq = np.fft.rfftfreq(self.bufferSize, 1 / self.sample_rate)
-        self.fftfreq = self.fftfreq[:-1]
+        # self.fftfreq = self.fftfreq[:-1]
 
         #Initial clipping parameters
         self.pen_colours = [(173, 255, 47, 130), #Reference channel
@@ -336,7 +439,7 @@ class livePlot(object):
         winGraph.nextRow()
 
         #Impulse Responce
-        self.livePlot_plotCreation(title="Impulse Responce: " + chName,
+        self.livePlot_plotCreation(title="Impulse Response: " + chName,
                              xAxisMode="time",
                              yRange=[],
                              colspan=1,
@@ -424,11 +527,11 @@ class livePlot(object):
 
         self.curve[0].setData(self.tVec, current[self.selection,:], pen=self.pen[self.selection], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
         self.curve[1].setData(self.tVec, current[self.chidx[0],:], pen=self.pen[self.chidx[0]], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[2].setData(self.fftfreq, gz.amp2db(spectra[self.selection, 0:int(self.bufferSize//2)]), pen=self.pen_colours[0], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[3].setData(self.fftfreq, gz.amp2db(spectra[self.chidx[0], 0:int(self.bufferSize//2)]), pen=self.pen_colours[1], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[4].setData(self.fftfreq, HdB[self.chidx[0], ...], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[5].setData(self.tVec, IR.real[self.chidx[0], ...], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[6].setData(self.fftfreq, gamma2[self.chidx[0], ...], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[2].setData(self.fftfreq, gz.amp2db(spectra[self.selection, 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[0], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[3].setData(self.fftfreq, gz.amp2db(spectra[self.chidx[0], 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[1], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[4].setData(self.fftfreq, HdB[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[5].setData(self.tVec, IR.real[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[6].setData(self.fftfreq, gamma2[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
 
         pg.QtGui.QApplication.processEvents()
 

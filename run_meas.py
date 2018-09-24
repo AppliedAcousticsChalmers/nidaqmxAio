@@ -7,6 +7,7 @@ import sys
 import numpy as np
 from pathlib import Path
 import configargparse
+
 # Program libraries
 import systemUtils as sy
 import ni_tools as ni
@@ -31,9 +32,12 @@ if __name__ == '__main__':
     p.add("-cal", "--calibration", help="Specify the calibration file, if it does not exist, ask if a new calibration measurement is needed", type=str)
     p.add("-micA", "--micAmp", help="Specify the amplification factior of he microphone", type=float, default=1)
     p.add("-sens", "--sensitivity", help="microphone sensitivity in mV/Pa", type=float, default=47.1)
-    p.add("-pp", "--postProcess", help="Post proccessing type", type=str, choices={"TF", "T60Schr"})
+    p.add("-pp", "--postProcess", help="Post processing type", type=str, choices={"TF", "RAC"})
     p.add("-cT", "--cutoffTime", help="Measurement time after the end of the signal, in s", type=int, default=0)
     p.add("-plt", "--plotting", help="Plots to display. Options: live, TF, timeSig, T60_one_band, T60_3rd", nargs='+', default=['live'])
+    p.add("-fRange", "--frequencyRange", help="Frequency range for postProcess calculation example \[fmin, fmax, bandwidth\]", nargs='+', default=[20, 10000, 'third'])
+    p.add("-refCh", "--refferenceChannel", help="Prespecify which channel will be used as reference", default = "")
+    p.add("-cmt", "--comment", help="Adds a text comment to the save file.", type=str, default="")
 
     # Parse arguments
     args = p.parse_args()
@@ -45,6 +49,7 @@ if __name__ == '__main__':
     Caldirectory = "acquired_data\\calibration_files"
     sy.create_dir(directory)
     sy.create_dir(Caldirectory)
+
     # Calibration. New calibration measurement or loading the calibration data
     if args.calibration:
         cal_postFilename = Caldirectory + "\\" + args.calibration + "_Cal"
@@ -58,7 +63,10 @@ if __name__ == '__main__':
                 args.newMeasurement = 0
                 meas = ni.ni_io_tf(args,cal=True)
                 calibrationData = pp.mic_calibration(meas, args.sensitivity)
-                np.save(cal_postFilename, calibrationData)
+
+                sy.simple_file_save(calibrationData, args.calibration + "_Cal", Caldirectory)
+
+
             else:
                 print("No calibration data given")
                 calibrationData = [1, 1]
@@ -70,29 +78,26 @@ if __name__ == '__main__':
     if args.newMeasurement == 1:
         meas = ni.ni_io_tf(args, calibrationData)
         # Save the new measurement
-        filenames = sy.file_save(meas, args.save_file, meas_directory, options=p.format_values())
+        filenames, meas_directory = sy.file_save(meas, args.save_file, meas_directory, options=p.format_values())
 
     # Post processing
     if args.postProcess:
         # File selection
         if args.newMeasurement == 0:
-            # Choosing the directory
-            selected_diretory = sy.dir_select(directory)
-            print(selected_diretory)
-            filenames = sy.file_select(selected_diretory)
+            # Choosing the directory and the files
+            filenames, selected_directory = sy.fileSystem(directory)
         else:
-            selected_diretory = meas_directory
-            # selected_diretory = filenames.rsplit('_',1)[0] + "_"
+            selected_directory = meas_directory
             filenames = [filenames + ".npy"]
         # Setting up the initial parameters
         for current_file in filenames:
             print("Processing file: " + current_file)
             if args.postProcess == "TF":
                 processedData = pp.TFcalc(current_file,  args.bufferSize, calibrationData, args.plotting)
-            elif args.postProcess == "T60Schr":
-                processedData = pp.T60Shroeder(current_file, args.bufferSize, calibrationData, args.plotting)
+            elif args.postProcess == "RAC":
+                processedData = pp.RAC(current_file, args.bufferSize, args.frequencyRange[0], args.frequencyRange[1], args.frequencyRange[2], calibrationData, args.plotting)
         # Saving the data
-            sy.file_save(processedData, current_file, selected_diretory, args.postProcess)
+            sy.file_save(processedData, current_file, selected_directory, args.postProcess)
 
-    if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION') and 'live' in args.plotting:
+    if (sys.flags.interactive != 1 and not args.refferenceChannel) or not hasattr(QtCore, 'PYQT_VERSION') and 'live' in args.plotting :
         pg.QtGui.QApplication.exec_()

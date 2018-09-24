@@ -3,10 +3,9 @@ import numpy as np
 from scipy import signal, array
 import math
 
-import matplotlib.pyplot as plt
 # Program libraries
 import utils as gz
-import filters as fl
+import filtersAndMathtools as flm
 
 def h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, refCH):
     '''
@@ -45,6 +44,7 @@ def h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, mic
 
     #Calculating the signal length and the number of channels
     blockSize = int(len(current_buffer[0]))
+    rfftBlock = int(blockSize / 2 + 1)
     nCHin = int(len(current_buffer))
 
     # window creation
@@ -55,51 +55,63 @@ def h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, mic
     spectra = np.zeros((nCHin, blockSize), dtype=complex)
     for chidx in range(nCHin):
         # Applying Hanning window
-        current_buffer[chidx, ...] = current_buffer[chidx, ...]*win
+        current_buffer[chidx, :] = current_buffer[chidx, :]*win
         # fft
-        spectra[chidx, ...] = np.fft.fft(current_buffer[chidx, ...]) / blockSize
+        spectra[chidx, :] = np.fft.fft(current_buffer[chidx, :]) / blockSize
 
     # Calculating S, AS, AD
     S = np.zeros((nCHin, nCHin, blockSize), dtype=complex)
     AD = np.zeros((nCHin, nCHin, blockSize), dtype=complex)
-    AS = np.zeros((nCHin, nCHin, int(blockSize // 2)), dtype=complex)
-    H = np.zeros((nCHin, int(blockSize // 2)), dtype=complex)
-    H_phase = np.zeros((nCHin, int(blockSize // 2)), dtype=float)
+    AS = np.zeros((nCHin, nCHin, rfftBlock), dtype=complex)
+    H = np.zeros((nCHin, rfftBlock), dtype=complex)
+    H_phase = np.zeros((nCHin, rfftBlock), dtype=float)
     HD = np.zeros((nCHin, int(blockSize)), dtype=complex)
-    IR = np.zeros((nCHin, int(blockSize)), dtype=complex)
-    HdB = np.zeros((nCHin, int(blockSize // 2)))
-    gamma2 = np.zeros((nCHin, int(blockSize // 2)))
-    # SNR = np.zeros((nCHin, blockSize // 2), dtype=float)
+    IR = np.zeros((nCHin, int(blockSize)), dtype=float)
+    HdB = np.zeros((nCHin, rfftBlock), dtype=float)
+    gamma2 = np.zeros((nCHin, rfftBlock), dtype=float)
+    SNR = np.zeros((nCHin, rfftBlock), dtype=float)
+
     for i in range(nCHin):
         for j in range(nCHin):
             if i != j and i != refCH:
                 continue
-            S[i, j, ...] = np.multiply(spectra.conj()[i, ...], spectra[j, ...])
+            S[i, j, :] = np.multiply(spectra.conj()[i, :], spectra[j, :])
             if blockidx == 0:
-                AD[i, j, ...] = S[i, j, ...]
+                AD[i, j, :] = S[i, j, :]
             else:
-                AD[i, j, ...] = previous_buffer[i, j, ...] - ((previous_buffer[i, j, ...] - S[i, j, ...]) / (blockidx + 1))
+                AD[i, j, :] = previous_buffer[i, j, :] - ((previous_buffer[i, j, :] - S[i, j, :]) / (blockidx + 1))
             AS[i, j, 0] = AD[i, j, 0]
-            AS[i, j, -1] = AD[i, j, int(blockSize) // 2]
-            AS[i, j, 1:-1] = 2 * AD[i, j, 1:int(blockSize // 2) - 1]
+            AS[i, j, -1] = AD[i, j, rfftBlock]
+            AS[i, j, 1:-1] = 2 * AD[i, j, 1:rfftBlock - 1]
 
     #Calculating H, HD, IR, H_phase, gamma2, HdB, SNR
     for i in range(nCHin):
         if i == refCH:
             continue
-        H[i, ...] = np.divide(AS[refCH, i, ...], AS.real[refCH, refCH, ...])
-        HD[i, ...] = np.divide(AD[refCH, i, ...], AD[refCH, refCH, ...])
-        IR[i, ...] = np.fft.ifft(HD[i, ...])
-        H_phase[i, ...] = np.unwrap(np.angle(H[i, ...]))
-        gamma2[i, ...] = (abs(AS[refCH, i, ...] ** 2)) / (np.multiply(AS.real[refCH, refCH, ...], AS.real[i, i, ...]))
-        HdB[i, ...] = gz.amp2db(H[i, ...])
-        # SNR[i, :] = gamma2[i, :] / (1 - gamma2[i, :])
+        H[i, :] = np.divide(AS[refCH, i, :], AS[refCH, refCH, :])
+        HD[i, :] = np.divide(AD[refCH, i, :], AD[refCH, refCH, :])
+        IR[i, :] = np.fft.ifft(HD[i, :]).real
+        H_phase[i, :] = np.unwrap(np.angle(H[i, :]))
+        gamma2[i, :] = (abs(AS[refCH, i, :] ** 2)) / (np.multiply(AS.real[refCH, refCH, :], AS.real[i, i, :]))
+        HdB[i, :] = gz.amp2db(H[i, :])
+        SNR[i, :] = gamma2[i, :] / (1 - gamma2[i, :])
     previous_buffer = AD
     blockidx += 1
 
-    return previous_buffer, spectra, blockidx, H, HD, HdB, H_phase, IR, gamma2 #,SNR
+    return previous_buffer, spectra, blockidx, H, HD, HdB, H_phase, IR, gamma2, SNR
 
-
+# def half_hann(length, side='left'):
+#     '''Creates a half hanning window
+#     Arguments: length - the length of the window in samples
+#     side - the side of the window's fade out. values: left or right
+#     '''
+#     win_samples = int(length)
+#     tvec = np.linspace(0, np.pi/2, win_samples)
+#     if side == 'right':
+#         win = np.cos(tvec)**2
+#     elif side == 'left':
+#         win = np.sin(tvec)**2
+#     return win
 
 def deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1):
     '''
@@ -177,64 +189,66 @@ def deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1):
 
     #Calculating the signal length and the number of channels
     signalLength = int(len(data[0]))
+    # rfft keeps only the real frequency bins of the fft plus the nyquist frequency and the DC
+    rfftBlock_temp = int(signalLength / 2 + 1) #Size prior to IR end clipping
+    rfftBlock = int(blockSize / 2 + 1) #Size after IR clipping
     nCHin = int(len(data))
 
     #Calculating the initial frequency vector
-    fftfreq = np.fft.fftfreq(signalLength, 1 / sr)
+    fftfreq_temp = np.fft.rfftfreq(signalLength, 1 / sr)
 
     #Calculating the frequencies that have meaningfull information
-    first_rfreq = np.min(np.where( fftfreq[:len(fftfreq)//2] >= f0 ))
-    last_rfreq = np.max(np.where( fftfreq[:len(fftfreq)//2] <= f1 ))
-    first_ifreq = len(fftfreq)//2 + np.min(np.where( fftfreq[len(fftfreq)//2:] >= -f0 ))
-    last_ifreq =  len(fftfreq)//2 + np.max(np.where( fftfreq[len(fftfreq)//2:] <= -f1 ))
+    first_rfreq = np.min(np.where( fftfreq_temp >= f0 ))
+    last_rfreq = np.max(np.where( fftfreq_temp <= f1 ))
 
     spectrogramm = []
-    spectra = np.zeros((nCHin, signalLength), dtype=complex)
+    spectra = np.zeros((nCHin, rfftBlock_temp), dtype=complex)
 
     for chidx in range(nCHin):
         # fft analisys
-        spectra[chidx, ...] = np.fft.fft(data[chidx, ...])
+        spectra[chidx, ...] = np.fft.rfft(data[chidx, ...])
 
         # Spectrogram
-        f_sp, t_sp, Sxx_sp = signal.spectrogram(data[chidx, ...], sr, nperseg=blockSize, noverlap= blockSize // 2, window='triang', scaling='density' )
-        Sxx_sp = 20 *np.log10(abs(Sxx_sp))
+        f_sp, t_sp, Sxx_sp = signal.spectrogram(data[chidx, ...], sr, nperseg=blockSize, noverlap= blockSize // 2, window='triang', scaling='spectrum', mode='magnitude' )
+        Sxx_sp = 10 * np.log10(abs(Sxx_sp))
         spectrogramm.append([f_sp, t_sp, Sxx_sp])
 
     # Vector preallocation
-    HD = np.zeros((nCHin, blockSize), dtype=complex)
-    H = np.zeros((nCHin,  blockSize//2), dtype=complex)
-    HdB = np.zeros((nCHin, blockSize//2), dtype=float)
-    H_phase = np.zeros((nCHin, blockSize//2), dtype=float)
-    IR = np.zeros((nCHin, blockSize), dtype=complex)
-    IR_temp = np.zeros((nCHin,  len(spectra[0])), dtype=complex)
-    HD_temp = np.zeros((nCHin, len(spectra[0])), dtype=complex)
+    IR = np.zeros((nCHin, blockSize), dtype=float)
+    HD = np.zeros((nCHin, rfftBlock), dtype=complex)
+    H = np.zeros((nCHin,  rfftBlock), dtype=complex)
+    HdB = np.zeros((nCHin, rfftBlock), dtype=float)
+    H_phase = np.zeros((nCHin, rfftBlock), dtype=float)
+    IR_temp = np.zeros((nCHin,  signalLength), dtype=float)
+    HD_temp = np.zeros((nCHin, rfftBlock_temp), dtype=complex)
 
     # Loop over the channels
     for i in range(nCHin):
         if i == refCH:
             continue
-        # Discarding frequencies outsided the sweep range
+        # Discarding frequencies outside the sweep range
         spectra[i, :first_rfreq] = 0
-        spectra[i, last_rfreq:first_ifreq] = 0
-        spectra[i, last_ifreq:] = 0
+        spectra[i, last_rfreq:] = 0
 
         # Deconvolution
         HD_temp[i,:] = spectra[i,:] / spectra[refCH,:]
-        IR_temp[i,:] = (np.fft.ifft(HD_temp[i,:]))
+        IR_temp[i,:] = np.fft.irfft(HD_temp[i,:])
 
         # Filtering
-        IR_temp[i,:] = fl.filters(IR_temp[i,:], sr).butter_bandpass_filter(f0 * 2 , f1 / 2 , 1)
+        IR_temp[i,:]= flm.butterWorthFilter(IR_temp[i,:], sr, frequecies=[f0 * 2, f1 / 2], order=2, filter_type='bandpass', method='ba')
 
         # Cutting the the tail of the IR
+        win = flm.half_hann(int(sr*0.01), 'right')
         IR[i,:] = IR_temp[i,:blockSize]
+        IR[i,-len(win):] *= win
 
         # Final results
-        HD[i,:] = np.fft.fft(IR[i,:])
-        H[i,:] = HD[i,:len(HD[i,:])//2]
+        HD[i,:] = np.fft.rfft(IR[i,:])
+        H[i,:] = HD[i,:]
         HdB[i,:] = gz.amp2db(H[i,:])
         H_phase[i,:] = np.unwrap(np.angle(H[i,:]))
 
-    tVec = np.linspace(0, len(IR[0, :]) / sr, len(IR[0, :]))
-    fftfreq = np.fft.fftfreq(blockSize, 1 / sr)
+    tVec = np.linspace(0, blockSize / sr, blockSize)
+    fftfreq = np.fft.rfftfreq(blockSize, 1 / sr)
 
     return H, HD, HdB, H_phase, IR, fftfreq, tVec, spectrogramm

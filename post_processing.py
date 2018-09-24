@@ -10,19 +10,24 @@ from tqdm import tqdm
 # Program libraries
 import utils as gz
 import TFestimation as TF
-import filters as fl
+import roomAcousticsModule as RA
+import filtersAndMathtools as flm
 import plotting as myplt
 
 
 def mic_calibration(measurements, sensitivity):
     # Reading the configuration
     keys = list(measurements.keys())
+    sr = measurements['SampleRate']
     sensitivity = float(sensitivity) * float(1e-3)
     calMeasurement = min([i1 for i1, s1 in enumerate(keys) if "cDAQ" in s1])
     values = list(measurements.values())
-    data = np.array(values[calMeasurement])
-    Lpmeas = max(gz.amp2db((data)/(sensitivity), ref=2e-5))
-    calibration = [10 ** ((93.9794 - Lpmeas)/20), sensitivity]
+    data = np.array(values[calMeasurement]) / sensitivity
+
+    #
+    Lpmeas = 20 * np.log10( np.sqrt( np.mean( data ** 2 )) / ( 2e-5  ))
+    calibration = [10 ** ((93.9791 - Lpmeas)/20), sensitivity, {"data":data,"SampleRate": sr}]
+    #
 
     return calibration
 
@@ -65,16 +70,16 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
     nCHin = int(len(data))
     print("Completed")
 
-    # Removing the zero padding of the signal
+    # # Removing the zero padding of the signal
     # if simTime < 5 or ("sweep" in signalType[0]):
-        # print("Removing the zero padding of the signal (This will take a while)... ", end="")
-        # convxymin = np.convolve((data[int(refCH), ...]), np.flipud(signalUnpadded), 'valid')
-        # convxymax = np.convolve(np.flipud(data[int(refCH), ...]), signalUnpadded, 'valid')
+    #     print("Removing the zero padding of the signal (This will take a while)... ", end="")
+    #     convxymin = np.convolve((data[int(refCH), ...]), np.flipud(signalUnpadded), 'valid')
+    #     convxymax = np.convolve(np.flipud(data[int(refCH), ...]), signalUnpadded, 'valid')
 
-        # pad_start = np.argmax(convxymin)
-        # pad_end = np.argmax(convxymax)
-        # data = data[..., pad_start:]
-        # data = data[..., pad_start:-pad_end]
+    #     pad_start = np.argmax(convxymin)
+    #     pad_end = np.argmax(convxymax)
+    #     data = data[..., pad_start:]
+    #     data = data[..., pad_start:-pad_end]
         # print("Completed")
 
 
@@ -94,7 +99,6 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
         # Arranging the data into blocks
         print("Arranging the data into blocks")
         for chidx in range(nCHin):
-            print(np.shape(data))
             i0 = 0
             pbar1 = tqdm(total=nBlocks)
             for idx in range(nBlocks):
@@ -112,7 +116,7 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
         pbar2 = tqdm(total=nBlocks)
         for idx in range(nBlocks):
             current_buffer = dataMatrix[:,:,idx]
-            previous_buffer, _, blockidx, H, HD, HdB, H_phase, IR, gamma2 = TF.h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, refCH)
+            previous_buffer, _, blockidx, H, HD, HdB, H_phase, IR, gamma2, SNR = TF.h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, refCH)
             pbar2.update()
         pbar2.close()
 
@@ -149,41 +153,25 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
             if pltidx == refCH:
                 continue
             if ("noise" in signalType[0]):
-                plots = {'TF':[fftfreq[:-1], HdB[pltidx, :]],
-                         'gamma2':[fftfreq[-1], gamma2[pltidx, :]],
-                         'IR':[tVec, IR.real[pltidx, :]],
-                         'phase':[fftfreq[-1], H_phase[pltidx, :]]}
+                plots = {'TF':[fftfreq, HdB[pltidx, :]],
+                         'gamma2':[fftfreq, gamma2[pltidx, :]],
+                         'IR':[tVec, IR[pltidx, :]],
+                         'phase':[fftfreq, H_phase[pltidx, :]]}
             elif ("sweep" in signalType[0]):
-                plots = {'TF':[fftfreq[:-1], HdB[pltidx, :]],
+                plots = {'TF':[fftfreq, HdB[pltidx, :]],
                          'spectrogram':[spectrogramm[pltidx][1], spectrogramm[pltidx][0],spectrogramm[pltidx][2]],
                          'IR':[tVec, IR.real[pltidx, :]],
-                         'phase':[fftfreq[-1], H_phase[pltidx, :]]}
+                         'phase':[fftfreq, H_phase[pltidx, :]]}
 
             myplt.irSubPlot(plots, filename + "_" + str(pltidx), "Channel: " + keys[pltidx])
 
-    # Time signals plotting
-    if 'timeSig' in plotting:
-        time_signals_plot = {'xAxisTitle': 'time in s',
-                             'yAxisTitle': 'Amplitude',
-                             'plotTitle':  filename + '_time_signals',
-                             'scale':'lin'}
-
-        full_tVec = np.linspace(0,simTime, int(len(data[0])))
-        time_signals = data
-        time_signals[:refCH, :] = (data[:refCH, :] / micAmp) * calibrationData[0]
-        time_signals[refCH+1:, :] = (data[refCH+1:, :] / micAmp) * calibrationData[0]
-
-        for idx in range(nCHin):
-            time_signals_plot.update({str(idx):[full_tVec, time_signals[idx,:],"Channel:" + keys[idx]]})
-
-        myplt.singlePlot(time_signals_plot)
-
     print("Process Finished")
+    print("")
 
     return measuredFRFs
 
 
-def T60Shroeder(filename, blockSize, calibrationData, plotting):
+def RAC(filename, blockSize, f_min, f_max, bandWidth, calibrationData, plotting):
     """Calculates the T_60 values in the bandwidth specified, using Schroeder's
        backwards intergration method.
 
@@ -215,114 +203,55 @@ def T60Shroeder(filename, blockSize, calibrationData, plotting):
     IR = np.delete(IR, (refCH), axis=0)
     print("completed")
 
-    #Removing the source - rec distance
-    print("Removing source - receiver distance...", end="")
-    # for idx in range(0, len(IR)):
-    IR_head, IR_tail = fl.filters(IR[0,:], sr).removeDelay()
 
-    IR_headVEC = np.array(range(0,len(IR_head)))
-    IR_tailVEC = len(IR_head) + np.array(range(0,len(IR_tail)))
-    print("completed")
+    db = lambda x: flm.NormAmp2dB(x)
 
-
-    print("Converting IR into 3rd octave bands...", end="")
-    IR_3rd, fvec_3rd = fl.filters(IR_tail,sr).band_filter(20,sr / 2.56,"third")
-    IR_3rd = np.array(IR_3rd)
-    print("completed")
-
-    T_60 = []
-    T_30 = []
-    print("Calculating T60 for each band")
-    pbar1 = tqdm(total=len(IR_3rd-1))
-    for idx in range(0,len(IR_3rd-1)):
-
-        IR_current = IR_3rd.real[idx,:]
-
-        #Finding the analytical signal and taking it's envelope through the hilbert transform
-        s_anal = hilbert(IR_current)
-        envelope =  abs(s_anal)
-
-        #Calculating the moving average of the envelope
-        moav = fl.smooth(envelope, int(0.1 * sr), 'flat')
-        moav_dB = fl.amp2dB(moav)
-
-        #Finding the correct threshold for the calculation of tau
-        threshold = np.average(moav_dB[int(len(moav)*0.75):int(len(moav_dB)*0.75)+2000])
-        tau = fl.findTau(moav_dB, tVec, threshold)
-
-        #Calculating the Shroeder curve
-        Rev_int = np.zeros((len(IR_current[:tau])))
-        Rev_int[tau::-1] =(np.cumsum(moav[tau:0:-1]) / np.sum(moav[0:tau]))
-        Rev_int_dB = fl.amp2dB(Rev_int)
-
-        #Fitting a line in the Shroeder curve
-        fit_range = int(len(Rev_int_dB) * 0.75)
-        x = tVec[:fit_range]
-        Rev_int_fit = Rev_int_dB[:fit_range]
-        (b, a) = polyfit(x, Rev_int_fit, 1)
-        xr=polyval([b,a],tVec)
-
-        #Fitting the guiding lines
-        x_5dB = polyval([0,max(Rev_int_dB)-5],tVec)
-        x_35dB = polyval([0,max(Rev_int_dB)-35],tVec)
-
-        #Calculating T_60
-        T_60.append( -60 / b)
-
-        #Calculating T_30
-        t_5dB = tVec[np.argmin(abs(xr-x_5dB))]
-        t_35dB = tVec[np.argmin(abs(xr-x_35dB))]
-        T_30.append(t_35dB - t_5dB)
-
-
+    T_30, T_60, tau, fVec_band, IRs, IR2s, Rev_int_curves, line_fits_T30, line_fits_T60 = RA.T60(IR[0], sr, tVec, f_min=float(f_min), f_max=float(f_max), bandWidth=str(bandWidth))
 
     # #Plotting
 
+    for idx in range(0,len(T_60)):
         # Scroeder one band
-        plot1y = fl.amp2dB(IR_current)
-        plot2y = fl.amp2dB(envelope)
-        plot3y = fl.amp2dB(moav)
-        plot4y = fl.amp2dB(Rev_int)
-        plot5y = xr
-        plot6y = x_5dB
-        plot7y = x_35dB
-        plots2 = {'0':[tVec,plot1y,'Impulse Responce at %i Hz 3rd octave band: ' % (fvec_3rd[idx]) ],
-             '1':[tVec,plot2y,'Envelope'],
-             '2':[tVec,plot3y,'Moving average filter'],
-             '3':[tVec,plot4y,'Schroeder curver'],
-             '4':[tVec,plot5y,'Linear fit'],
-             '5':[tVec,plot6y,'-5dB'],
-             '6':[tVec,plot7y,'-35dB'],
+        plot1y = db(IRs[idx])
+        plot2y = db(IR2s[idx])
+        plot3y = db(Rev_int_curves[idx])
+        plot4y = line_fits_T30[idx][0]
+        plot5y = line_fits_T60[idx][0]
+        plot6y = line_fits_T30[idx][1]
+        plot7y = line_fits_T30[idx][2]
+        plot8y = line_fits_T60[idx][2]
+        plots2 = {'0':[tVec,plot1y,'Impulse Response at %i Hz 3rd octave band: ' % (fVec_band[idx]) ],
+            '1':[tVec,plot2y,'Squared IR'],
+            '2':[tVec,plot3y,'Schroeder curve'],
+            '3':[tVec,plot4y,'Linear fit T30'],
+            '4':[tVec,plot5y,'Linear fit T60'],
+            '5':[tVec,plot6y,'-5dB'],
+            '6':[tVec,plot7y,'-35dB'],
+            '7':[tVec,plot8y,'-65dB'],
              'xAxisTitle': 'time in s',
              'yAxisTitle': 'Amplitude',
-             'plotTitle': filename + "_@_" + str(fvec_3rd[idx]),
+             'plotTitle': filename + "_@_" + str(fVec_band[idx]),
              'scale':'lin'}
 
         if 'T60_one_band' in plotting: myplt.singlePlot(plots2)
 
-        pbar1.update()
-    pbar1.close()
-
-    # Source - Receiver removal
-    plots = {'0':[np.array(len(IR[0,:])),IR.real[0,:],'Impulse Responce'],
-             '1':[IR_headVEC,IR_head.real,'head'],
-             '2':[IR_tailVEC,IR_tail.real,'tail'],
-             'xAxisTitle': 'time in s',
-             'yAxisTitle': 'Amplitude',
-             'plotTitle': 'initial delay removal',
-             'scale':'lin'}
-
-    if 'T60_SRR' in plotting: myplt.singlePlot(plots)
-
-    # T60 final
-    plots3 = {'0': [fvec_3rd,T_60,"T60"],
+    # T60 and T30 in bands
+    plots2 = {'0': [fVec_band,T_60,"T60"],
+              '1': [fVec_band,T_30,"T30"],
               'xAxisTitle': 'frequency in Hz',
               'yAxisTitle': 'time in s',
-              'plotTitle': filename + "T_60",
+              'plotTitle': filename + "_RT",
               'scale':'log'}
 
-    if 'T60_3rd' in plotting: myplt.singlePlot(plots3)
-    #Saving the data
-    RT = {'T60Schroeder': T_60, 'T30Schroeder': T_30, 'fVec_3rd': fvec_3rd}
+    if 'T60_3rd' in plotting: myplt.singlePlot(plots2)
+
+    # Saving the data
+    print("Saving the processed data... ", end="")
+    RT = {'T60Schroeder': T_60, 'T30Schroeder': T_30, 'fVec_band': fVec_band,
+          "tVec":tVec, 'fVec':fVec, 'IRs':IRs, "IR2s":IR2s, "Rev_int_curves":Rev_int_curves, "line_fits_T30":line_fits_T30, "line_fits_T60":line_fits_T60}
+    print("Completed")
+
+    print("Process Finished")
+    print("")
 
     return [measurements, RT]
