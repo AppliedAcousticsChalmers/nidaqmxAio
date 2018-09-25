@@ -21,7 +21,7 @@ The script is built without external triggering/clocking devices in mind and the
 If you need to run the script with other than the default values, specify the corresponding arguments explicitly.
 
 `-sig <string> <float> <float>` or `--signalType <string> <float> <float>`:
-The type of the output signal to be generated. Currently, `[noise_white]`, `[noise_pink]`, `[sweep_linear, f0, f1]`, `[sweep_logarithmic, f0, f1]` and `[tone, f0]`  are supported (default: `pink_noise`). The values `f0`, `f1` correspond to the starting and stopping frequecy of the sweep repsectivelly. In the case of the tone signal `f0` corresponds to the frequency of the signal.
+The type of the output signal to be generated. Currently, `[noise_white]`, `[noise_pink]`, `[sweep_linear, f0, f1]`, `[sweep_logarithmic, f0, f1]`, `[tone, f0]` and `[matLab, filename]`  are supported (default: `pink_noise`). The values `f0`, `f1` correspond to the starting and stopping frequecy of the sweep repsectivelly. In the case of the tone signal `f0` corresponds to the frequency of the signal. The `matLab` reads a `.mat` file and outputs it. The file should contain a structure with a variable named `audio` in it. 
 
 `-pad <int>` or `--pad_samples <int>`:
 Pad N samples at the end of the signal to avoid input truncation due to system delays (default `5000`)
