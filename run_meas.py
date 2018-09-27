@@ -37,7 +37,7 @@ if __name__ == '__main__':
     p.add("-plt", "--plotting", help="Plots to display. Options: live, TF, timeSig, T60_one_band, T60_3rd", nargs='+', default=['live'])
     p.add("-fRange", "--frequencyRange", help="Frequency range for postProcess calculation example \[fmin, fmax, bandwidth\]", nargs='+', default=[20, 10000, 'third'])
     p.add("-refCh", "--refferenceChannel", help="Prespecify which channel will be used as reference", default = "")
-    p.add("-cmt", "--comment", help="Adds a text comment to the save file.", type=str, default="")
+    p.add("-nt", "--note", help="Adds a text note to the save file.", type=str, default="")
 
     # Parse arguments
     args = p.parse_args()
