@@ -77,7 +77,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
     else: micAmp = int(micAmp)
 
     # Creating the dictionary to store the data
-    measurements = {'simulationTime': sim_time, 'SampleRate': float(sample_rate), 'Signal': args.signalType, 'Input_range_in_Vrms': ai_range, 'Output_range_in_Vrms': ao_range, 'bufferSize': bufferSize, 'micAmp': micAmp, 'Unpadded_signal': signal_unpadded, 'Reference_channel': [], 'Comments': args.comment}
+    measurements = {'simulationTime': sim_time, 'SampleRate': float(sample_rate), 'Signal': args.signalType, 'Input_range_in_Vrms': ai_range, 'Output_range_in_Vrms': ao_range, 'bufferSize': bufferSize, 'micAmp': micAmp, 'Unpadded_signal': signal_unpadded, 'Reference_channel': [], 'Note': args.note}
 
     # Reading the present in/out channels
     channel_list = []
