@@ -1,5 +1,5 @@
 time: 2
-sampleRate: 48000
+sampleRate: 51200
 newMeasurement: 1
 channelsIn: [2]
 channelsOut: [2]
@@ -22,7 +22,7 @@ calibration: testing1
 micAmp: 10
 sensitivity: 47.1	
 postProcess: RAC
-frequencyRange: [200, 400, third]
+frequencyRange: [200, 400, third] fs
 #postProcess: TF
 #cutoffTime: 0
 cutoffTime: 2
