@@ -75,5 +75,5 @@ Run the chosen post processing script. You will be asked to select the directory
 `-refCH <float>` or `--refferenceChannel <float>`: 
  Presets the channel that is going to be used as reference, bypassing the command line dialog, when the measurement script is run (default=`'"""'`).
  
- `-mt <string>` or `--note <string>`:
+ `-nt <string>` or `--note <string>`:
  Saves a text note on the output file (default=`""`). 
