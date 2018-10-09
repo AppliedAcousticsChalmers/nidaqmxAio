@@ -1,8 +1,6 @@
 # Python libraries
 import numpy as np
-import math
-from scipy import signal, array, polyfit, polyval
-from scipy.signal import hilbert
+from scipy import polyfit, polyval
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -13,9 +11,9 @@ import filtersAndMathtools as flm
 def T60(IR, sr, tVec, f_min=20, f_max=10e3, bandWidth="third"):
 
     """Calculates the T_60 values in the bandwidth specified, using Schroeder's
-       backwards intergration method.
+       backward integration method.
        The function uses the calibration data, and the blockSize parameters to
-       calculate the impulse responce of the room from the measured data folder,
+       calculate the impulse response of the room from the measured data folder,
        prior to the T_60 calculation.
        """
     db = lambda x: flm.NormAmp2dB(x)
@@ -44,7 +42,7 @@ def T60(IR, sr, tVec, f_min=20, f_max=10e3, bandWidth="third"):
         mng = plt.get_current_fig_manager()
         mng.window.state('zoomed')
         plt.title(str(fvec[idx]) + " Hz " + str(bandWidth) + "-octave band")
-        plt.figtext(.5,.85,"Please select the begining of the nose floor.", ha="center")
+        plt.figtext(.5,.85,"Please select the beginning of the nose floor.", ha="center")
         plt.plot(tVec, db(IR_current**2))
         plt.xlabel('time in sec')
         plt.ylabel('Amplitude in dB')
@@ -57,13 +55,13 @@ def T60(IR, sr, tVec, f_min=20, f_max=10e3, bandWidth="third"):
         plt.close()
 
         while True:
-            #Calculating the Shroeder curve
+            #Calculating the Schroeder curve
             IR2 = IR_current ** 2
             Rev_int = np.zeros((len(IR2[:tau])))
             Rev_int[tau::-1] =(np.cumsum(IR2[tau:0:-1]) / np.sum(IR2[0:tau]))
             Rev_int_dB = db(Rev_int)
 
-            #Fitting a line in the Shroeder curve
+            #Fitting a line in the Schroeder curve
             fit_start = flm.find_nearest(Rev_int_dB, -5)[0]
             fit_T30 = flm.find_nearest(Rev_int_dB, -35)[0]
             fit_T60 = flm.find_nearest(Rev_int_dB, -65)[0]

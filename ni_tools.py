@@ -5,12 +5,13 @@ import numpy as np
 import time
 from tqdm import tqdm
 import copy
+
 # Program libraries
 import systemUtils as syU
-import utils as gz
 import meas_signal as sig
 import TFestimation as TF
 import plotting as myPlt
+
 # nidaqmx libraries
 import nidaqmx.system
 import nidaqmx
@@ -40,7 +41,7 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         number_of_channels_out = args.channelsOut
         pad_samples = args.pad_samples
 
-    # Setting the sampling frequency to be an even number, so the Niquist frequency is at the last bin of each block
+    # Setting the sampling frequency to be an even number, so the Nyquist frequency is at the last bin of each block
     # Correcting the sampling rate to correspond to one supported by the cDAQ system's clock (see sampleRateCorrection funtion for more information)
     if input_sample_rate % 2 != 0 and cal == False:
         sample_rate -= input_sample_rate % 2
@@ -167,7 +168,6 @@ def ni_io_tf(args, calibrationData=[1, 1], cal=False):
         # Starting the data acquisition/reproduction
 
         # Initialization
-
         if 'live' in args.plotting and idx_ai:live_Plot = myPlt.livePlot(args, number_of_channels_in, bufferSize, sample_rate, selection, copy.copy(chSelect))
 
         timeCounter = 0

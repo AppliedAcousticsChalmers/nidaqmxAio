@@ -30,18 +30,18 @@ if __name__ == '__main__':
     p.add("-sv", "--save_file", help="Exported data to filename.", type=str, default='measurement')
     p.add("-bf", "--bufferSize", help="Input buffer size in samples", type=int, default=8192)
     p.add("-cal", "--calibration", help="Specify the calibration file, if it does not exist, ask if a new calibration measurement is needed", type=str)
-    p.add("-micA", "--micAmp", help="Specify the amplification factior of he microphone", type=float, default=1)
+    p.add("-micA", "--micAmp", help="Specify the amplification factor of he microphone", type=float, default=1)
     p.add("-sens", "--sensitivity", help="microphone sensitivity in mV/Pa", type=float, default=47.1)
     p.add("-pp", "--postProcess", help="Post processing type", type=str, choices={"TF", "RAC"})
     p.add("-cT", "--cutoffTime", help="Measurement time after the end of the signal, in s", type=int, default=0)
     p.add("-plt", "--plotting", help="Plots to display. Options: live, TF, timeSig, T60_one_band, T60_3rd", nargs='+', default=['live'])
     p.add("-fRange", "--frequencyRange", help="Frequency range for postProcess calculation example \[fmin, fmax, bandwidth\]", nargs='+', default=[20, 10000, 'third'])
-    p.add("-refCh", "--refferenceChannel", help="Prespecify which channel will be used as reference", default = "")
+    p.add("-refCh", "--refferenceChannel", help="Pre-specify which channel will be used as reference", default = "")
     p.add("-nt", "--note", help="Adds a text note to the save file.", type=str, default="")
 
     # Parse arguments
     args = p.parse_args()
-    # Print used arguements
+    # Print used arguments
     print(p.format_values())
     # Create directories for saving data
     directory = "acquired_data"

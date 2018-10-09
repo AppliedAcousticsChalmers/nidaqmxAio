@@ -6,15 +6,14 @@ from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 
 #Program libraries
-import utils as gz
-
+import filtersAndMathtools as flm
 
 def singlePlot(plots):
     """
-    Outputs a signle plot with arbitary many lines of data.
+    Outputs a single plot with arbitrary many lines of data.
     The data should be given in a dictionary formated as:
 
-    plots = {'0':[tVec,IR.real[1,:],'Impulse Responce'],
+    plots = {'0':[tVec,IR.real[1,:],'Impulse Response'],
               'xAxisTitle': 'frequency in Hz',
               'yAxisTitle': 'H',
               'plotTitle': 'Plot title',
@@ -26,7 +25,7 @@ def singlePlot(plots):
     [x axis data, y axis data, legend name]
 
     The last three keys refer to the tittles of the x,y axis
-    and the title of the plot respectivelly.
+    and the title of the plot respectively.
     """
 
     trace = []
@@ -54,11 +53,11 @@ def singlePlot(plots):
 
 def singlePlot_CI(plots):
     """
-    Outputs a signle plot with arbitary many lines of data,
+    Outputs a single plot with arbitrary many lines of data,
     with their respective confidence intervals
     The data should be given in a dictionary formated as:
 
-    plots = {'0':[tVec, mean, lower CI, upper CI, 'Impulse Responce','bar' or 'scatter'],
+    plots = {'0':[tVec, mean, lower CI, upper CI, 'Impulse Response','bar' or 'scatter'],
               'xAxisTitle': 'frequency in Hz',
               'yAxisTitle': 'H',
               'plotTitle': 'Plot title',
@@ -70,7 +69,7 @@ def singlePlot_CI(plots):
     [x axis data, y axis data, legend name]
 
     The last three keys refer to the tittles of the x,y axis
-    and the title of the plot respectivelly.
+    and the title of the plot respectively.
     """
 
 
@@ -121,10 +120,10 @@ def singlePlot_CI(plots):
 
 def polarPlot(plots):
     """
-    Outputs a signle plot with arbitary many lines of data.
+    Outputs a single plot with arbitrary many lines of data.
     The data should be given in a dictionary formated as:
 
-    plots = {'0':[theta, data, 'Impulse Responce','markers' or 'lines'],
+    plots = {'0':[theta, data, 'Impulse Response','markers' or 'lines'],
               'plotTitle': 'Plot title'}
 
     The each line of data should be registered to a key,
@@ -158,31 +157,31 @@ def irSubPlot(plots, filename, title):
     Outputs a plot with 4 subplots for an IR measurement conducted
     using a Noise or a Sweep signal.
 
-    The plots pressented are:
+    The plots presented are:
 
     Noise signal:
                  [1,1] - Transfer function,
                  [1,2] - Coherence,
-                 [2,1] - Impulse responce,
+                 [2,1] - Impulse response,
                  [2,2] - Phase
 
     Sweep signal:
                  [1,1] - Transfer function,
                  [1,2] - Spectrogram,
-                 [2,1] - Impulse responce,
+                 [2,1] - Impulse response,
                  [2,2] - Phase
 
     The type of the [1,2] subplot is determined by the name of the key.
     If 'gamma2' is used, a list with [frequency vector, coherence] is expected.
     If 'spectrogram' is used, a list with [frequency vector, time vector, magnitude] is expected.
 
-    The input is a ditionary in the form:
+    The input is a dictionary in the form:
 
     plots = {'TF':[frequency vector, Transfer function],
              'gamma2':[frequency vector, coherence], or
              'spectrogram':[frequency vector, time vector, magnitude],
-             'IR':[time vectror, Impulse responce],
-             'phase':[frequency vectror, Phase]}
+             'IR':[time vector, Impulse response],
+             'phase':[frequency vector, Phase]}
 
     filename - the name of the output file
     title - The title of the plot
@@ -248,7 +247,7 @@ def irSubPlot(plots, filename, title):
 
 class livePlot(object):
     '''
-    Class that handles the preallocation, update, and clipping of the live plotting of nidaqio.
+    Class that handles the preallocation, update, and clipping of the live plotting of nidaqmxAio.
 
     Methods:
     __init__: Initializes the plotting object.
@@ -264,11 +263,11 @@ class livePlot(object):
 
     def __init__(self, args, number_of_channels_in, bufferSize, sample_rate, selection, channelNames):
         '''
-        Method initialazes the plotting object.
+        Method initializes the plotting object.
 
         Inputs:
         - number_of_channels: the list containing the number of channels used.
-        Ex [2,1] for 2 modules using 2 and 1 channels respectivelly.
+        Ex [2,1] for 2 modules using 2 and 1 channels respectively.
 
         - args: The parser arguments input of the CLI.
         - bufferSize: The bufferSize used by the program. This is not inputed by the args because the program
@@ -278,7 +277,7 @@ class livePlot(object):
         - channelNames: the list with the channelNames provided by the niDAQmx API.
         '''
 
-        #Initial arguements
+        #Initial arguments
         self.args = args
         self.number_of_channels = sum(number_of_channels_in)
         self.bufferSize = bufferSize
@@ -337,7 +336,7 @@ class livePlot(object):
 
     def livePlotClipp(self,data):
         '''
-        The method checks if the time signals clipp and changes the pen colours acordingly.
+        The method checks if the time signals clip and changes the pen colours accordingly.
 
         Red - If the signal clips durring the current block.
         Orange - If the signal has clipped in one of the previous blocks.
@@ -467,10 +466,10 @@ class livePlot(object):
         - xAxisMode: sets the x axis to time or frequency and the scale to lin or log respectivelly.
         The values of the axis are calculated by __init__.
         - yRange: sets the limits for the y axis
-        - colspan: sets the number of colums the subplot will occupy.
+        - colspan: sets the number of columns the subplot will occupy.
         - nPlots: the number of curves created in the same plot.
         - plt_idx: indexing for the current plot. Used in the case many subplots with different amount of curves are needed.
-        Example: If a figure with 2 subplots containg 2 cureves each is needed, the method should be called 2 times.
+        Example: If a figure with 2 subplots containing 2 curves each is needed, the method should be called 2 times.
         First using nPlots=2 and plt_idx=0 and the second time with nPlots=2 and plt_idx=1
         '''
 
@@ -519,7 +518,7 @@ class livePlot(object):
 
         Inputs:
         - current: The vector with the current block of time signals.
-        - spectra: The instantaneus spectra of the current block.
+        - spectra: The instantaneous spectra of the current block.
         - HdB: The estimated TF in dB.
         - IR: The corresponding IR.
         - gamma2: The coherence of the measurement.
@@ -527,8 +526,8 @@ class livePlot(object):
 
         self.curve[0].setData(self.tVec, current[self.selection,:], pen=self.pen[self.selection], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
         self.curve[1].setData(self.tVec, current[self.chidx[0],:], pen=self.pen[self.chidx[0]], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[2].setData(self.fftfreq, gz.amp2db(spectra[self.selection, 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[0], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[3].setData(self.fftfreq, gz.amp2db(spectra[self.chidx[0], 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[1], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[2].setData(self.fftfreq, flm.amp2db(spectra[self.selection, 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[0], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[3].setData(self.fftfreq, flm.amp2db(spectra[self.chidx[0], 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[1], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
         self.curve[4].setData(self.fftfreq, HdB[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
         self.curve[5].setData(self.tVec, IR.real[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
         self.curve[6].setData(self.fftfreq, gamma2[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')

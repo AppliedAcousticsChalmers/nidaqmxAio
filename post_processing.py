@@ -1,14 +1,8 @@
 # Python libraries
-from plotly import tools
-import plotly.offline as py
-import plotly.graph_objs as go
 import numpy as np
-import math
-from scipy import signal, array, polyfit, polyval
-from scipy.signal import hilbert
 from tqdm import tqdm
+
 # Program libraries
-import utils as gz
 import TFestimation as TF
 import roomAcousticsModule as RA
 import filtersAndMathtools as flm
@@ -24,10 +18,9 @@ def mic_calibration(measurements, sensitivity):
     values = list(measurements.values())
     data = np.array(values[calMeasurement]) / sensitivity
 
-    #
     Lpmeas = 20 * np.log10( np.sqrt( np.mean( data ** 2 )) / ( 2e-5  ))
-    calibration = [10 ** ((93.9791 - Lpmeas)/20), sensitivity, {"data":data,"SampleRate": sr}]
-    #
+    calibration_coef = 10 ** ((93.9791 - Lpmeas)/20)
+    calibration = [calibration_coef, sensitivity, {"data":data,"SampleRate": sr,"calibration":calibration_coef, "Mic_sensitivity":sensitivity}]
 
     return calibration
 
@@ -70,23 +63,10 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
     nCHin = int(len(data))
     print("Completed")
 
-    # # Removing the zero padding of the signal
-    # if simTime < 5 or ("sweep" in signalType[0]):
-    #     print("Removing the zero padding of the signal (This will take a while)... ", end="")
-    #     convxymin = np.convolve((data[int(refCH), ...]), np.flipud(signalUnpadded), 'valid')
-    #     convxymax = np.convolve(np.flipud(data[int(refCH), ...]), signalUnpadded, 'valid')
-
-    #     pad_start = np.argmax(convxymin)
-    #     pad_end = np.argmax(convxymax)
-    #     data = data[..., pad_start:]
-    #     data = data[..., pad_start:-pad_end]
-        # print("Completed")
-
-
     # Calculating the TF for Noise signals
     if ("noise" in signalType[0]):
 
-        # Zeropadding
+        # Zero-padding
         numberOfsamples = int(len(data[0]))
         print("Zeropadding... ", end="")
         zeropad = blockSize - numberOfsamples % blockSize
@@ -173,10 +153,10 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
 
 def RAC(filename, blockSize, f_min, f_max, bandWidth, calibrationData, plotting):
     """Calculates the T_60 values in the bandwidth specified, using Schroeder's
-       backwards intergration method.
+       backward integration method.
 
        The function uses the calibration data, and the blockSize parameters to
-       calculate the impulse responce of the room from the measured data folder,
+       calculate the impulse response of the room from the measured data folder,
        prior to the T_60 calculation.
 
        """
@@ -211,7 +191,7 @@ def RAC(filename, blockSize, f_min, f_max, bandWidth, calibrationData, plotting)
     # #Plotting
 
     for idx in range(0,len(T_60)):
-        # Scroeder one band
+        # Schroeder one band
         plot1y = db(IRs[idx])
         plot2y = db(IR2s[idx])
         plot3y = db(Rev_int_curves[idx])

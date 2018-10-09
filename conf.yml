@@ -1,12 +1,12 @@
-time: 10
+time: 2
 sampleRate: 48000
 newMeasurement: 1
 channelsIn: [2]
 channelsOut: [2]
 
-#signalType: [sweep_logarithmic, 1, 24000]
+signalType: [sweep_logarithmic, 1, 24000]
 #signalType: [sweep_linear, 1581, 15000]
-signalType: [noise_white]
+#signalType: [noise_white]
 #signalType: [noise_pink]
 #signalType: [tone, 105]
 
@@ -14,14 +14,14 @@ pad_samples: 0
 aiRange: 5		
 aoRange: 4		
 save_file: my_measurement
-comment: this is my comment
+note: this is my comment
 bufferSize: 2048
 bufferSize: 7200
 
 calibration: testing1
 micAmp: 10
 sensitivity: 47.1	
-#postProcess: RAC
+postProcess: RAC
 frequencyRange: [200, 400, third]
 #postProcess: TF
 #cutoffTime: 0
@@ -30,4 +30,4 @@ cutoffTime: 2
 plotting: [live, timeSig, TF, T60_3rd, T60_one_band]
 #plotting: ['no']
 
-#refferenceChannel: 2
+refferenceChannel: 1

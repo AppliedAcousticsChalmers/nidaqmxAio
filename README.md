@@ -21,7 +21,7 @@ The script is built without external triggering/clocking devices in mind and the
 If you need to run the script with other than the default values, specify the corresponding arguments explicitly.
 
 `-sig <string> <float> <float>` or `--signalType <string> <float> <float>`:
-The type of the output signal to be generated. Currently, `[noise_white]`, `[noise_pink]`, `[sweep_linear, f0, f1]`, `[sweep_logarithmic, f0, f1]`, `[tone, f0]` and `[matLab, filename]`  are supported (default: `pink_noise`). The values `f0`, `f1` correspond to the starting and stopping frequecy of the sweep repsectivelly. In the case of the tone signal `f0` corresponds to the frequency of the signal. The `matLab` reads a `.mat` file and outputs it. The file should contain a structure with a variable named `audio` in it. 
+The type of the output signal to be generated. Currently, `[noise_white]`, `[noise_pink]`, `[sweep_linear, f0, f1]`, `[sweep_logarithmic, f0, f1]`, `[tone, f0]` and `[matLab, filename]`  are supported (default: `pink_noise`). The values `f0`, `f1` correspond to the starting and stopping frequency of the sweep respectively. In the case of the tone signal `f0` corresponds to the frequency of the signal. The `matLab` reads a `.mat` file and outputs it. The file should contain a structure with a variable named `audio` in it. 
 
 `-pad <int>` or `--pad_samples <int>`:
 Pad N samples at the end of the signal to avoid input truncation due to system delays (default `5000`)
@@ -56,7 +56,7 @@ Specifies the filename of the calibration data file. If it's not present ask if 
 `-pp <string>` or `--postProcess <string>`:
 Run the chosen post processing script. You will be asked to select the directory and a the file from a list (typing `all` will cause the script to run for all the files in the selected directory with the file extension`.np[yz]`, except the calibration files). Results will be saved as `<measurement_name>_TFs`. Current choices:
 `TF` - Estimates the transfer function using the H1 estimator, or the deconvolution method. The correct method is chosen automatically depending on the signal type used in the measurement.
-`RAC` - Estimates the reverberation time using the back-wards integration method. This script always causes the `TF` postporssesing script to run in order to calculate the impulse response using the desired calibration data and block size.
+`RAC` - Estimates the reverberation time using the back-wards integration method. This script always causes the `TF` post-porssesing script to run in order to calculate the impulse response using the desired calibration data and block size.
 
 `-cT <int>` or `--cutoffTime <int>`:
  Causes the algorithm to keep measuring for the specified amount of seconds after the output has stopped. (default: `0`)
@@ -64,7 +64,7 @@ Run the chosen post processing script. You will be asked to select the directory
 `-plt <string> <string> ...` or `--plotting <string> <string> ...`:
   Causes the algorithm to output the specified plots, if the corresponding script is run. Current choices:
   `live` - Plots live, the time signals or processed data during the data acquisition.
-  `TF` - Plots the transfer function, coherence/spectrogram (depending on the method), impulse response and phase, when the `TF` postprossesing script is run.
+  `TF` - Plots the transfer function, coherence/spectrogram (depending on the method), impulse response and phase, when the `TF` post-prossesing script is run.
   `timeSig` - Plots the raw time signals, when the measurement script is run.
   `T60_one_band` - Plots each step of the back-wards integration method for each octave band calculated, when the `RAC` script is run.
   `T60_3rd` - Plots the T60 in 3rd octave bands, when the `RAC` script is run.

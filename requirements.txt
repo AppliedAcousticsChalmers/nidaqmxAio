@@ -5,6 +5,8 @@ configargparse
 numpy
 scipy
 colorednoise
-pyqtgraph	
+pyqtgraph
 tqdm
 nidaqmx
+matplotlib
+plotly

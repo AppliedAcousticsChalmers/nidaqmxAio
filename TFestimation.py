@@ -4,7 +4,6 @@ from scipy import signal, array
 import math
 
 # Program libraries
-import utils as gz
 import filtersAndMathtools as flm
 
 def h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, micAmp, refCH):
@@ -12,8 +11,8 @@ def h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, mic
     Calculates the TF of a system using the H1 estimator method
 
     The function works in a block by block fashion, averaging the current input with
-    it's previous output while keepping track the number of blocks that have been processed.
-    For this reason it's usable also for real time prossesing of TF measurements.
+    it's previous output while keeping track the number of blocks that have been processed.
+    For this reason it's usable also for real time processing of TF measurements.
 
     -INPUTS-
     - current_buffer: current block of raw data in a numpy array (number of channels, samples)
@@ -30,10 +29,10 @@ def h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, mic
     - previous_buffer: as in the inputs
     - spectra: the single sided spectra of the current buffer
     - blockidx: as in inputs
-    - H: the resulting single sidded TF
-    - HD: the resulting double sidded TF
-    - HdB: the single sidded TF in dB with reference 1V
-    - H_phase: the pahse of the TF in dB reference 1V
+    - H: the resulting single sided TF
+    - HD: the resulting double sided TF
+    - HdB: the single sided TF in dB with reference 1V
+    - H_phase: the phase of the TF in dB reference 1V
     - IR: the resulting IR of the system, in V
     - gamma2: the resulting coherence
     '''
@@ -93,61 +92,48 @@ def h1_estimator(current_buffer, previous_buffer, blockidx, calibrationData, mic
         IR[i, :] = np.fft.ifft(HD[i, :]).real
         H_phase[i, :] = np.unwrap(np.angle(H[i, :]))
         gamma2[i, :] = (abs(AS[refCH, i, :] ** 2)) / (np.multiply(AS.real[refCH, refCH, :], AS.real[i, i, :]))
-        HdB[i, :] = gz.amp2db(H[i, :])
+        HdB[i, :] = flm.amp2db(H[i, :])
         SNR[i, :] = gamma2[i, :] / (1 - gamma2[i, :])
     previous_buffer = AD
     blockidx += 1
 
     return previous_buffer, spectra, blockidx, H, HD, HdB, H_phase, IR, gamma2, SNR
 
-# def half_hann(length, side='left'):
-#     '''Creates a half hanning window
-#     Arguments: length - the length of the window in samples
-#     side - the side of the window's fade out. values: left or right
-#     '''
-#     win_samples = int(length)
-#     tvec = np.linspace(0, np.pi/2, win_samples)
-#     if side == 'right':
-#         win = np.cos(tvec)**2
-#     elif side == 'left':
-#         win = np.sin(tvec)**2
-#     return win
-
 def deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1):
     '''
     Calculates the IR and TF using the deconvolution method.
 
     -INPUTS-
-    - data: raw multychannel data in the form of a numpy array (number of channels, samples)
+    - data: raw multichannel data in the form of a numpy array (number of channels, samples)
     - sr: sampling rate
     - blockSize: blockSize for the spectrogram's fft analysis and number of samples of the
     resulting IR that contain valuable information.
     - calibrationData: list with [ calibration coefficient, microphone sensitivity]
     - micAmp: microphone preamplificaltion
     - refCH: the index that corresponds to the reference channel in the data
-    - f0: start frequecy of the sweep
+    - f0: start frequency of the sweep
     - f1: stop frequency of the sweep
 
     -OUTPUTS-
-    - H: the resulting single sidded TF
-    - HD: the resulting double sidded TF
-    - HdB: the single sidded TF in dB with reference 1V
+    - H: the resulting single sided TF
+    - HD: the resulting double sided TF
+    - HdB: the single sided TF in dB with reference 1V
     - H_phase: the pahse of the TF in dB reference 1V
     - IR: the resulting IR of the system, in V
     - fftfreq: the corresponding frequency vector
     - tVec: the corresponding time vector
-    - spectrogramm: the resulting spectrogramm. list:[time vector, frequency vector, magnitude]
+    - spectrogram: the resulting spectrogram. list:[time vector, frequency vector, magnitude]
 
 
-    For optimal accurasy three conditions should be taken under consideration.
+    For optimal accuracy three conditions should be taken under consideration.
 
     1. The margins of the sweep should be larger that the required frequency range
     of measurement, in order to ensure that the filtering will be applied in a range
     where no information will be lost. Since this algorithm is created with measurements
-    of room acoustics in mind, the applied filter is a 1st order butterworth in order for
+    of room acoustics in mind, the applied filter is a 2nd order butterworth in order for
     it's IR to be short enough to be applied in a rooms IR, without losing information.
 
-    2. Zeropadding in the beginning of the signal should be used in order for the sweep
+    2. Zero padding in the beginning of the signal should be used in order for the sweep
     to start from zero, avoiding non linearities in the fft analysis.
 
     3. Sufficient measurement time should be considered for better SNR, while the decay of
@@ -159,26 +145,26 @@ def deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1):
     a. The calibrationData and the external microphone amplification is applied to the
     raw data signals
 
-    b. The frequency vector of the fft analisys is calulated and the frequencies that
-    contain meaningfull information are detected. This refers to the frequencies of the
-    fft analisys that are inside the frequency range of the sweep. Outside of this range
-    the fft analisys will just contain numerical errors that are not usefull, or posses
-    any physical meaning. Therefore the spectra outside of the meanigfull frequency range
-    are set to zero. This procedure is done in the double sided spectrum, so four frequncies
-    specyfy the usefull frequency range, f0, f1, -f1, -f1, where f0 and f1 correspond to
+    b. The frequency vector of the fft analysis is calculated and the frequencies that
+    contain meaningful information are detected. This refers to the frequencies of the
+    fft analysis that are inside the frequency range of the sweep. Outside of this range
+    the fft analysis will just contain numerical errors that are not useful, or posses
+    any physical meaning. Therefore the spectra outside of the meaningful frequency range
+    are set to zero. This procedure is done in the single sided spectrum, so two frequencies
+    specify the useful frequency range, f0, f1, where f0 and f1 correspond to
     the beginning and the end of the sweep respectively.
 
-    c. The spectra of the measurement channels are divided by the spectra of the the reference
-    channel, yielding the TF of the system. The initial IR is calculated using the ifft of the TFcalc
+    c. The spectra of the measurement channels are divided by the spectra of the reference
+    channel, yielding the TF of the system. The initial IR is calculated using numpy's irfft.
 
-    d. The initial IR is filtered using a 1st order bandpass butterworth filter, with critical
+    d. The initial IR is filtered using a 2nd order bandpass butterworth filter, with critical
     frequencies [ 2 * f0, f1 / 2].
 
-    e. The resulting IR will be as long as the measurement and the therefore it's TF will be quite
-    noisy. For that reason the IR is cutt to the part which it contains usefull information, using
-    the blockSize parameter.
+    e. The resulting IR will be as long as the measurement, while distortions will be pushed toward
+    it's end. Therefore it's TF will be quite noisy. For that reason the IR is cut to the part containing
+    useful information, using the blockSize parameter.
 
-    f. The TF and phase can be calculated using the apprpriate ft analisys in the resulting IR.
+    f. The TF and phase can be calculated using the appropriate fft analysis in the resulting IR.
 
     '''
 
@@ -197,7 +183,7 @@ def deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1):
     #Calculating the initial frequency vector
     fftfreq_temp = np.fft.rfftfreq(signalLength, 1 / sr)
 
-    #Calculating the frequencies that have meaningfull information
+    #Calculating the frequencies that have meaningful information
     first_rfreq = np.min(np.where( fftfreq_temp >= f0 ))
     last_rfreq = np.max(np.where( fftfreq_temp <= f1 ))
 
@@ -205,7 +191,7 @@ def deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1):
     spectra = np.zeros((nCHin, rfftBlock_temp), dtype=complex)
 
     for chidx in range(nCHin):
-        # fft analisys
+        # fft analysis
         spectra[chidx, ...] = np.fft.rfft(data[chidx, ...])
 
         # Spectrogram
@@ -245,7 +231,7 @@ def deconvolution(data, sr, blockSize, calibrationData, micAmp, refCH, f0, f1):
         # Final results
         HD[i,:] = np.fft.rfft(IR[i,:])
         H[i,:] = HD[i,:]
-        HdB[i,:] = gz.amp2db(H[i,:])
+        HdB[i,:] = flm.amp2db(H[i,:])
         H_phase[i,:] = np.unwrap(np.angle(H[i,:]))
 
     tVec = np.linspace(0, blockSize / sr, blockSize)

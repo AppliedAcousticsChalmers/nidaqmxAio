@@ -14,7 +14,7 @@ def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage
     :sample_rate: sample rate for signal generation (int)
     :time_of_signal: signal length in seconds (float/int)
     :padN: zero padding in front of the signal (int)
-    :signal_type: curently "noise_pink", "noise_white", "tone", "sweep_logarithmic" etc.
+    :signal_type: currently "noise_pink", "noise_white", "tone", "sweep_logarithmic" etc.
     :voltage_out: peak output in voltage
     :cutoffTime: time in seconds that the signal is padded at the end. Used for interrupted noise measurements
 
@@ -62,7 +62,7 @@ def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage
         signal_unpadded = matFile['audio'][0]
         time_of_signal = int(len(signal_unpadded) / sample_rate)
     else:
-        print('Unlnown signal type. Reverting to pink noise')
+        print('Unknown signal type. Reverting to pink noise')
         signal_unpadded = cn.powerlaw_psd_gaussian(1, number_of_samples)
 
     signal_unpadded /= np.max(abs(signal_unpadded)) / voltage_out
@@ -79,9 +79,9 @@ def testSig(sr, t, tones=[[100, 1, 0, 'sin']], noiseType='no', plotting=False):
     sr - sample rate
     t - time in seconds
     tones - list of tones that the signal will contain
-    format: tones=[tone1,tone2,...], where tone1 = [frequency, Amplitute, starting phase, type(sin or cos)]
+    format: tones=[tone1,tone2,...], where tone1 = [frequency, Amplitude, starting phase, type(sin or cos)]
     noise - noise added to the resulting signal
-    format: noise=[type, amplitude in percetage of the overall max amplitude of the tonal part of the signal]
+    format: noise=[type, amplitude in percentage of the overall max amplitude of the tonal part of the signal]
     plotting - plots the resulting signal
 
     '''
