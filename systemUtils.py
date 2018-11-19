@@ -6,7 +6,7 @@ from collections.abc import Mapping
 import numpy as np
 import math
 
-def fileSystem(directory):
+def fileSystem(directory, preSelect = ''):
     '''
     Prints the sub directories for given directory and the .npy, .npz files,
     asks for user input.
@@ -42,8 +42,11 @@ def fileSystem(directory):
                 idx += 1
 
             #Selecting the first option if no input is given
-            selection = input()
-            if not selection: selection = 0
+            if preSelect:
+                selection = preSelect
+            else:
+                selection = input()
+                if not selection: selection = 0
 
             #Checking if the selection is a directory
             if selection != "cd." and selection != "all": is_directory = os.path.isdir(directory + '\\' + dir_names[int(selection)])

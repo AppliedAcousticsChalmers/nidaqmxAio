@@ -104,7 +104,7 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
         print("Saving the processed data... ", end="")
         fftfreq = np.fft.rfftfreq(blockSize, 1 / sr)
         tVec = np.linspace(0, len(IR[0, :]) / sr, len(IR[0, :]))
-        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "gamma2ij": gamma2, "fftfreq": fftfreq, "tVec": tVec})
+        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "gamma2ij": gamma2, "H_phase":H_phase, "fftfreq": fftfreq, "tVec": tVec})
         print("Completed")
 
     # Calculating the TF for Sweep signal
@@ -123,7 +123,7 @@ def TFcalc(filename, blockSize, calibrationData, plotting):
 
         # Saving the data
         print("Saving the processed data... ", end="")
-        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "H_phase":H_phase, "fftfreq": fftfreq, "tVec": tVec})
+        measuredFRFs.update({"Hij": H, "HdBij": HdB, "HDij": HD, "IRij": IR, "H_phase":H_phase, "Spectrogram":spectrogramm, "fftfreq": fftfreq, "tVec": tVec})
         print("Completed")
 
 
