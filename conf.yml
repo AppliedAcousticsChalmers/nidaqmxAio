@@ -15,14 +15,14 @@ aiRange: 5
 aoRange: 4		
 save_file: my_measurement
 note: this is my comment
-bufferSize: 2048
-bufferSize: 7200
+#bufferSize: 2048
+#bufferSize: 7200
 
 calibration: testing1
 micAmp: 10
 sensitivity: 47.1	
-postProcess: RAC
-frequencyRange: [200, 400, third] fs
+postProcess: RAC	
+frequencyRange: [200, 400, third]
 #postProcess: TF
 #cutoffTime: 0
 cutoffTime: 2
