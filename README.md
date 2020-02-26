@@ -4,8 +4,14 @@ Input/output acquisition automation using the [nidaqmx](https://github.com/ni/ni
 
 ### Prerequisites
 
-You need to be able to run python scripts on your system with version >3.6 installed. nidaqmx supports only Windows OS.
-Python prerequisites found in `requirements.txt`.
+You need to be able to run python scripts on your system with version 3.6.x installed. nidaqmx supports only Windows OS.
+Python prerequisites are found in `requirements.txt`. 
+
+### Installation
+It is strongly advised to create a virtual environment having a python 3.6 installation and install all the required packages there using `pip install -r requirements.txt ` in the project's folder.
+For management of multiple versions of python on windows, use [`pyenv-win`](https://github.com/pyenv-win/pyenv-win#installation).
+A guide for creating and managing virtual environment can be found [here](https://realpython.com/python-virtual-environments-a-primer/)
+
 
 ### Usage
 Run `python run_meas.py -c <configuration_file_name.yml` to run using the specified configuration file. An example configuration file is provided.
@@ -41,6 +47,9 @@ The analog output absolute peak expected in volts (default: `0.001`)
 `-sv <string>` or `--save_file <string>`:
  Name of the saved output file.  (default: `measurement`)
 
+`-dir <string>` or `--root_directory <string>`':
+Set the desired directory, where the measurement data will be saved, or the script's file manager will open (default `./acquired_data/`)
+
 `-bf <int>` or `--bufferSize <int>`:
 Buffer size in samples of the input channels. This is used also as the time window for the analysis done at both the live post-processing preview and the Transfer function post-processing script. In the deconvolution analysis, corresponds to the block size of the spectrogram and the window that the IR is expected to end in samples (default: `8192`).
 
@@ -54,7 +63,7 @@ Specifies the filename of the calibration data file. If it's not present ask if 
  Specifies the sensitivity of the used microphone default `47.1` mV/Pa.
 
 `-pp <string>` or `--postProcess <string>`:
-Run the chosen post processing script. You will be asked to select the directory and a the file from a list (typing `all` will cause the script to run for all the files in the selected directory with the file extension`.np[yz]`, except the calibration files). Results will be saved as `<measurement_name>_TFs`. Current choices:
+Run the chosen post processing script. You will be asked to select the directory and a the file from a list (typing `all` will cause the script to run for all the files in the selected directory with the file extension`.np[yz]`, except the calibration files). Results will be saved as `<measurement_name>_TF`. Current choices:
 `TF` - Estimates the transfer function using the H1 estimator, or the deconvolution method. The correct method is chosen automatically depending on the signal type used in the measurement.
 `RAC` - Estimates the reverberation time using the back-wards integration method. This script always causes the `TF` post-porssesing script to run in order to calculate the impulse response using the desired calibration data and block size.
 

@@ -4,21 +4,27 @@ from scipy import signal
 import matplotlib.pyplot as plt
 import scipy.io as io
 
-#Program libraries
+# Program libraries
 import filtersAndMathtools as flm
 
 
-def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage_out, cutoffTime=0):
-    """Create the output signal to be measured.
+def create_signal(sample_rate, time_of_signal, pad_samples, signal_type,
+                  voltage_out, cutoffTime=0):
+    """
+    Create the output signal to be measured.
+    Inputs:
+    - sample_rate: sample rate for signal generation (int)
+    - time_of_signal: signal length in seconds (float/int)
+    - padN: zero padding in front of the signal (int)
+    - signal_type: currently "noise_pink", "noise_white", "tone",
+    "sweep_logarithmic" etc.
+    - voltage_out: peak output in voltage
+    - cutoffTime: time in seconds that the signal is padded at the end. Used
+    for interrupted noise measurements
 
-    :sample_rate: sample rate for signal generation (int)
-    :time_of_signal: signal length in seconds (float/int)
-    :padN: zero padding in front of the signal (int)
-    :signal_type: currently "noise_pink", "noise_white", "tone", "sweep_logarithmic" etc.
-    :voltage_out: peak output in voltage
-    :cutoffTime: time in seconds that the signal is padded at the end. Used for interrupted noise measurements
-
-    :returns: (signal, unpadded_Signal)
+    Outputs:
+    - signal
+    - unpadded_Signal
 
     """
 
@@ -54,7 +60,8 @@ def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage
         f1 = int(signal_type[2])
         win_right = flm.half_hann(int(sample_rate * 0.001), 'right')
         win_left = flm.half_hann(int(sample_rate * 0.001), 'left')
-        signal_unpadded = signal.chirp(time_vector, f0, time_of_signal, f1, method, phi=270)
+        signal_unpadded = signal.chirp(time_vector, f0, time_of_signal, f1,
+                                       method, phi=270)
         signal_unpadded[-len(win_right):] *= win_right
         signal_unpadded[:len(win_left)] *= win_left
     elif sig[0] == "matLab":
@@ -66,23 +73,29 @@ def create_signal(sample_rate, time_of_signal, pad_samples, signal_type, voltage
         signal_unpadded = cn.powerlaw_psd_gaussian(1, number_of_samples)
 
     signal_unpadded /= np.max(abs(signal_unpadded)) / voltage_out
-    signal_padded = np.pad(signal_unpadded, (pad_samples, pad_end), 'constant', constant_values=[0, 0])
+    signal_padded = np.pad(signal_unpadded, (pad_samples, pad_end), 'constant',
+                           constant_values=[0, 0])
     signal_size_in_samples = len(signal_padded)
 
-    return [signal_padded, signal_unpadded, signal_size_in_samples, time_of_signal, cutoffTime]
+    return [signal_padded, signal_unpadded, signal_size_in_samples,
+            time_of_signal, cutoffTime]
+
 
 def testSig(sr, t, tones=[[100, 1, 0, 'sin']], noiseType='no', plotting=False):
     '''
-    Creates signals composed of tones and noise for test purposes. This function is not used anywhere in the
-    program.
+    Creates signals composed of tones and noise for test purposes. This
+    function is not used anywhere in the program.
 
-    sr - sample rate
-    t - time in seconds
-    tones - list of tones that the signal will contain
-    format: tones=[tone1,tone2,...], where tone1 = [frequency, Amplitude, starting phase, type(sin or cos)]
-    noise - noise added to the resulting signal
-    format: noise=[type, amplitude in percentage of the overall max amplitude of the tonal part of the signal]
-    plotting - plots the resulting signal
+    Inputs:
+    - sr: sample rate
+    - t: time in seconds
+    - tones: list of tones that the signal will contain
+    format: tones=[tone1,tone2,...], where tone1 = [frequency, Amplitude,
+    starting phase, type(sin or cos)]
+    - noise: noise added to the resulting signal
+    format: noise=[type, amplitude in percentage of the overall max amplitude
+    of the tonal part of the signal]
+    - plotting: plots the resulting signal
 
     '''
     tVec = np.linspace(0, t, t * sr)
@@ -91,10 +104,10 @@ def testSig(sr, t, tones=[[100, 1, 0, 'sin']], noiseType='no', plotting=False):
     for i in range(0, len(tones)):
         A = tones[i][1]
         f = tones[i][0]
-        if len(tones[i]) == 2 :
+        if len(tones[i]) == 2:
             phi = 0
             tone_type = 'sin'
-        elif len(tones[i]) == 3 :
+        elif len(tones[i]) == 3:
             tone_type = 'sin'
         else:
             phi = tones[i][2]
@@ -105,7 +118,7 @@ def testSig(sr, t, tones=[[100, 1, 0, 'sin']], noiseType='no', plotting=False):
             testSig += A * np.cos(2 * np.pi * f * tVec + phi)
         else:
             print("Unknown tone type skipping...")
-    #Adding noise
+    # Adding noise
     if noiseType == 'no':
         noise = 0
     else:
@@ -119,7 +132,7 @@ def testSig(sr, t, tones=[[100, 1, 0, 'sin']], noiseType='no', plotting=False):
         noise *= noiseType[1]
     testSig += noise
 
-    if plotting == True:
+    if plotting:
         plt.plot(tVec, testSig)
         plt.show()
 

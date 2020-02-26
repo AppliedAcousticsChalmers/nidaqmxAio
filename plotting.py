@@ -1,12 +1,13 @@
 import numpy as np
 import plotly.offline as py
 import plotly.graph_objs as go
-from plotly import tools
-from pyqtgraph.Qt import QtGui, QtCore
+from pyqtgraph.Qt import QtGui
+from plotly import subplots
 import pyqtgraph as pg
 
-#Program libraries
+# Program libraries
 import filtersAndMathtools as flm
+
 
 def singlePlot(plots):
     """
@@ -17,7 +18,7 @@ def singlePlot(plots):
               'xAxisTitle': 'frequency in Hz',
               'yAxisTitle': 'H',
               'plotTitle': 'Plot title',
-              'scale':'lin' or 'log;}
+              'scale':'linear' or 'log;}
 
     The each line of data should be registered to a key,
     named '0', '1', etc. The data assigned to the key should
@@ -31,19 +32,19 @@ def singlePlot(plots):
     trace = []
     for idx in range(0, len(plots.keys())-4):
         trace.append(go.Scatter(
-            x = plots[str(idx)][0],
-            y = plots[str(idx)][1],
-            name = plots[str(idx)][2]
+            x=plots[str(idx)][0],
+            y=plots[str(idx)][1],
+            name=plots[str(idx)][2]
         ))
     layout = go.Layout(
         title=plots['plotTitle'],
         xaxis=dict(
-        title=plots['xAxisTitle'],
-        type=plots['scale'],
-        autorange=True
+            title=plots['xAxisTitle'],
+            type=plots['scale'],
+            autorange=True
         ),
         yaxis=dict(
-        title=plots['yAxisTitle'],
+            title=plots['yAxisTitle'],
         )
     )
     fig = go.Figure(data=trace, layout=layout)
@@ -51,17 +52,23 @@ def singlePlot(plots):
 
     return
 
-def singlePlot_CI(plots):
+
+def singlePlot_CI(plots, export=True):
     """
     Outputs a single plot with arbitrary many lines of data,
     with their respective confidence intervals
     The data should be given in a dictionary formated as:
 
-    plots = {'0':[tVec, mean, lower CI, upper CI, 'Impulse Response','bar' or 'scatter'],
+    plots = {'0':[tVec, mean, lower CI, upper CI, 'Impulse Response','bar',
+                  'barVar' (for bar plots with certain width) or 'scatter'],
               'xAxisTitle': 'frequency in Hz',
               'yAxisTitle': 'H',
               'plotTitle': 'Plot title',
-              'scale': 'lin' or 'log' or 'category' (for equally spaced bar plots)}
+              'scale': 'linear' or 'log' or 'category' (for equally spaced
+                        bar plots)}
+    export: if True will export an html figure in the web browser. if false
+            the function
+            will return the figure
 
     The each line of data should be registered to a key,
     named '0', '1', etc. The data assigned to the key should
@@ -72,51 +79,67 @@ def singlePlot_CI(plots):
     and the title of the plot respectively.
     """
 
-
     trace = []
     for idx in range(0, len(plots.keys())-4):
         if plots[str(idx)][5] == 'bar':
             trace.append(go.Bar(
-                x = plots[str(idx)][0],
-                y = plots[str(idx)][1],
-                name = plots[str(idx)][4],
-                error_y = dict(
-                    type = 'data',
+                x=plots[str(idx)][0],
+                y=plots[str(idx)][1],
+                name=plots[str(idx)][4],
+                error_y=dict(
+                    type='data',
                     symmetric=False,
-                    array = plots[str(idx)][3],
-                    arrayminus = plots[str(idx)][2]
+                    array=plots[str(idx)][3],
+                    arrayminus=plots[str(idx)][2]
                 )
             ))
+        elif plots[str(idx)][5] == 'barVar':
+            trace.append(go.Bar(
+                x=plots[str(idx)][0],
+                y=plots[str(idx)][1],
+                name=plots[str(idx)][4],
+                width=plots[str(idx)][6],
+                error_y=dict(
+                    type='data',
+                    symmetric=False,
+                    array=plots[str(idx)][3],
+                    arrayminus=plots[str(idx)][2]
+                )
+            ))
+
         else:
             trace.append(go.Scatter(
-            x = plots[str(idx)][0],
-            y = plots[str(idx)][1],
-            name = plots[str(idx)][4],
-            mode = plots[str(idx)][5],
-            error_y = dict(
-                type = 'data',
-                symmetric=False,
-                array = plots[str(idx)][3],
-                arrayminus = plots[str(idx)][2]
+                x=plots[str(idx)][0],
+                y=plots[str(idx)][1],
+                name=plots[str(idx)][4],
+                mode=plots[str(idx)][5],
+                error_y=dict(
+                    type='data',
+                    symmetric=False,
+                    array=plots[str(idx)][3],
+                    arrayminus=plots[str(idx)][2]
                 )
-        ))
+            ))
 
     layout = go.Layout(
         title=plots['plotTitle'],
         xaxis=dict(
-        title=plots['xAxisTitle'],
-        type=plots['scale'],
-        autorange=True
+            title=plots['xAxisTitle'],
+            type=plots['scale'],
+            autorange=True
         ),
         yaxis=dict(
-        title=plots['yAxisTitle'],
-        # range= [0, 0.06]
+            title=plots['yAxisTitle'],
+            # range= [0, 0.06]
         )
     )
     fig = go.Figure(data=trace, layout=layout)
-    py.plot(fig, filename=plots['plotTitle'] + '.html')
+    if export:
+        py.plot(fig, filename=plots['plotTitle'] + '.html')
+        return
+    else:
+        return fig
 
-    return
 
 def polarPlot(plots):
     """
@@ -134,14 +157,13 @@ def polarPlot(plots):
     The last key refers to the tittle of the plot.
     """
 
-
     trace = []
     for idx in range(0, len(plots.keys())-1):
         trace.append(go.Scatterpolar(
-            theta = plots[str(idx)][0],
-            r = plots[str(idx)][1],
-            name = plots[str(idx)][2],
-            mode = plots[str(idx)][3]
+            theta=plots[str(idx)][0],
+            r=plots[str(idx)][1],
+            name=plots[str(idx)][2],
+            mode=plots[str(idx)][3]
             ))
     layout = go.Layout(
         title=plots['plotTitle']
@@ -173,7 +195,8 @@ def irSubPlot(plots, filename, title):
 
     The type of the [1,2] subplot is determined by the name of the key.
     If 'gamma2' is used, a list with [frequency vector, coherence] is expected.
-    If 'spectrogram' is used, a list with [frequency vector, time vector, magnitude] is expected.
+    If 'spectrogram' is used, a list with
+       [frequency vector, time vector, magnitude] is expected.
 
     The input is a dictionary in the form:
 
@@ -216,9 +239,13 @@ def irSubPlot(plots, filename, title):
         )
 
     if ("gamma2" in plots.keys()):
-        fig = tools.make_subplots(rows=2, cols=2, subplot_titles=('HdB', 'gamma2', 'IR', 'H_phase'))
+        fig = subplots.make_subplots(
+            rows=2, cols=2,
+            subplot_titles=('HdB', 'gamma2', 'IR', 'H_phase'))
     elif ("spectrogram" in plots.keys()):
-        fig = tools.make_subplots(rows=2, cols=2, subplot_titles=('HdB', 'Spectrogram', 'IR', 'H_phase'))
+        fig = subplots.make_subplots(
+            rows=2, cols=2,
+            subplot_titles=('HdB', 'Spectrogram', 'IR', 'H_phase'))
 
     fig.append_trace(trace1, 1, 1)
     fig.append_trace(trace2, 1, 2)
@@ -228,40 +255,93 @@ def irSubPlot(plots, filename, title):
     if ("gamma2" in plots.keys()):
         fig['layout'].update(legend=dict(y=0.5),
                              title=title,
-                             xaxis1=dict(title='frequency in Hz', type='log', autorange=True),
-                             xaxis2=dict(title='frequency in Hz', type='log', autorange=True),
-                             xaxis3=dict(title='time in s', type='lin', autorange=True),
-                             xaxis4=dict(title='frequency in Hz', type='log', autorange=True)
-        )
+                             xaxis1=dict(
+                                 title='frequency in Hz',
+                                 type='log',
+                                 autorange=True),
+                             yaxis1=dict(
+                                 title="Magnitude [dB ref 1]"
+                             ),
+                             xaxis2=dict(
+                                 title='frequency in Hz',
+                                 type='log',
+                                 autorange=True),
+                             yaxis2=dict(
+                                 title="Coherence"
+                             ),
+                             xaxis3=dict(
+                                 title='time in s',
+                                 type='linear',
+                                 autorange=True),
+                             yaxis3=dict(
+                                 title="Amplitude"
+                             ),
+                             xaxis4=dict(
+                                 title='frequency in Hz',
+                                 type='log',
+                                 autorange=True),
+                             yaxis4=dict(
+                                 title="Phase [degrees]"
+                             ),
+                             )
     elif ('spectrogram' in plots.keys()):
         fig['layout'].update(legend=dict(y=0.5),
-                         title=title,
-                         xaxis1=dict(title='frequency in Hz', type='log', autorange=True),
-                         xaxis2=dict(title='time in s', type='lin', autorange=True),
-                         yaxis2=dict(title='frequency in Hz', type='log', autorange=True),
-                         xaxis3=dict(title='time in s', type='lin', autorange=True),
-                         xaxis4=dict(title='frequency in Hz', type='log', autorange=True)
-    )
+                             title=title,
+                             xaxis1=dict(
+                                 title='frequency in Hz',
+                                 type='log',
+                                 autorange=True),
+                             yaxis1=dict(
+                                 title="Magnitude [dB ref 1]"
+                             ),
+                             xaxis2=dict(
+                                 title='time in s',
+                                 type='linear',
+                                 autorange=True),
+                             yaxis2=dict(
+                                 title='frequency in Hz',
+                                 type='log',
+                                 autorange=True),
+                             xaxis3=dict(
+                                 title='time in s',
+                                 type='linear',
+                                 autorange=True),
+                             yaxis3=dict(
+                                 title="Amplitude"
+                             ),
+                             xaxis4=dict(
+                                 title='frequency in Hz',
+                                 type='log',
+                                 autorange=True),
+                             yaxis4=dict(
+                                 title="Phase [degrees]"
+                             ),
+                             )
     py.plot(fig, filename=filename + '.html')
 
 
 class livePlot(object):
     '''
-    Class that handles the preallocation, update, and clipping of the live plotting of nidaqmxAio.
+    Class that handles the preallocation, update, and clipping of the
+      live plotting of nidaqmxAio.
 
     Methods:
     __init__: Initializes the plotting object.
     livePlotClipp: Detects and displays the clipping of the time signals.
-    livePlot_plotPreallocation: creates the figure, prior to data acquisition, according to the system settings.
-    livePlot_2CH_Noise: used by livePlot_plotPreallocation if the signal is noise and the number of channels is 2.
-    livePlotCreation: used by the livePlot_plotPreallocation in all the other cases.
-    livePlotUpdate: updates the values of the plots in all cases except the 2CH_Noise.
-    livePlotUpdate_2CH_Noise: updates the values of the plots in the 2CH_Noise case.
-
-
+    livePlot_plotPreallocation: creates the figure, prior to data acquisition,
+     according to the system settings.
+    livePlot_2CH_Noise: used by livePlot_plotPreallocation if the signal is
+     noise and the number of channels is 2.
+    livePlotCreation: used by the livePlot_plotPreallocation in all the other
+     cases.
+    livePlotUpdate: updates the values of the plots in all cases except the
+     2CH_Noise.
+    livePlotUpdate_2CH_Noise: updates the values of the plots in the 2CH_Noise
+     case.
     '''
 
-    def __init__(self, args, number_of_channels_in, bufferSize, sample_rate, selection, channelNames):
+    def __init__(self, args, number_of_channels_in,
+                 bufferSize, sample_rate, selection, channelNames):
         '''
         Method initializes the plotting object.
 
@@ -270,14 +350,17 @@ class livePlot(object):
         Ex [2,1] for 2 modules using 2 and 1 channels respectively.
 
         - args: The parser arguments input of the CLI.
-        - bufferSize: The bufferSize used by the program. This is not inputed by the args because the program
+        - bufferSize: The bufferSize used by the program.
+        This is not inputed by the args because the program
         ensures that bufferSize is a power of 2 after the CLI input.
-        - sample_rate: the sample rate used. This is not inputed by the args for the same reason as above.
+        - sample_rate: the sample rate used. This is not inputed by the args
+        for the same reason as above.
         - selection: the selected by the user reference channel.
-        - channelNames: the list with the channelNames provided by the niDAQmx API.
+        - channelNames: the list with the channelNames provided by the niDAQmx
+        API.
         '''
 
-        #Initial arguments
+        # Initial arguments
         self.args = args
         self.number_of_channels = sum(number_of_channels_in)
         self.bufferSize = bufferSize
@@ -292,18 +375,19 @@ class livePlot(object):
             self.channelNames.remove(self.channelNames[self.selection])
             self.chidx.remove(self.chidx[self.selection])
 
-
-        #Time and frequency vectors
-        self.tVec = np.linspace(0, self.bufferSize / self.sample_rate, self.bufferSize)
+        # Time and frequency vectors
+        self.tVec = np.linspace(
+            0, self.bufferSize / self.sample_rate, self.bufferSize)
         self.fftfreq = np.fft.rfftfreq(self.bufferSize, 1 / self.sample_rate)
         # self.fftfreq = self.fftfreq[:-1]
 
-        #Initial clipping parameters
-        self.pen_colours = [(173, 255, 47, 130), #Reference channel
-                            (200, 200, 200, 130), #Regular channel
-                            (255, 0, 0, 130), #Clipped block (red)
-                            (255, 127, 80, 130) #Previous block clipped (orange)
-        ]
+        # Initial clipping parameters
+        self.pen_colours = [(173, 255, 47, 130),  # Reference channel
+                            (200, 200, 200, 130),  # Regular channel
+                            (255, 0, 0, 130),  # Clipped block (red)
+                            (255, 127, 80, 130)  # Previous block clipped
+                                                 # (orange)
+                            ]
         self.pen = []
         self.clipped = []
         for i in range(0, self.number_of_channels):
@@ -314,9 +398,7 @@ class livePlot(object):
                 self.pen.append(self.pen_colours[1])
                 self.clipped.append(False)
 
-
-
-        #Window initialazation
+        # Window initialization
         global app
         app = QtGui.QApplication([])
         global winGraph
@@ -329,19 +411,19 @@ class livePlot(object):
         self.curve = []
         self.downsample = self.number_of_channels*0+1
 
-
         self.livePlot_plotPreallocation()
 
         return
 
-    def livePlotClipp(self,data):
+    def livePlotClipp(self, data):
         '''
-        The method checks if the time signals clip and changes the pen colours accordingly.
+        The method checks if the time signals clip and changes the pen
+        colours accordingly.
 
         Red - If the signal clips durring the current block.
         Orange - If the signal has clipped in one of the previous blocks.
         '''
-        current_max_val = np.amax(abs(data),1)
+        current_max_val = np.amax(abs(data), 1)
 
         for i in range(0, len(self.pen)):
             if current_max_val[i] >= self.args.aiRange:
@@ -354,126 +436,139 @@ class livePlot(object):
 
         return
 
-
     def livePlot_plotPreallocation(self):
         """
-        The method creates the graphs according to the input provided by the user in the __init__ part
+        The method creates the graphs according to the input provided by
+        the user in the __init__ part
 
         The cases are:
 
-            - Measurement without reference: Only the time signals are displayed in one subplot each
-        (for obvious reasons this is always the case for single channel measurements)
+        - Measurement without reference: Only the time signals are
+        displayed in one subplot each (for obvious reasons this is always the
+        case for single channel measurements)
 
-            - Measurement wth reference: Each subplot pressents the time signals for one channel
-        and the reference channel for easier comparison.
+        - Measurement with reference: Each subplot presents the time signals
+        for one channel and the reference channel for easier comparison.
 
-            - 2 Channel with reference using noise signal: The time signals are displayed as above, as well as
-        the instantaneus spectra, the H1 transfer function, the IR and coherence in different subplots.
+        - 2 Channel with reference using noise signal: The time signals are
+        displayed as above, as well as the instantaneous spectra, the H1
+        transfer function, the IR and coherence in different subplots.
 
         """
-
-        #Single channel measurement
+        # Single channel measurement
         if self.number_of_channels == 1:
-            self.livePlot_plotCreation(str("Time Signals: " + self.channelNames[0]), xAxisMode="time",
-                                  yRange=[-self.args.aiRange, self.args.aiRange], colspan=1, nPlots=1, plt_idx=0)
+            self.livePlot_plotCreation(
+                str("Time Signals: " + self.channelNames[0]),
+                xAxisMode="time",
+                yRange=[-self.args.aiRange,
+                        self.args.aiRange],
+                colspan=1, nPlots=1, plt_idx=0)
             return
 
-        #With reference channel
+        # With reference channel
         if self.selection != 'none':
-            #2CH Noise measurements
+            # 2CH Noise measurements
             if self.number_of_channels == 2 and "noise" in self.signalType:
                 self.livePlot_2CH_Noise(chName=self.channelNames[0])
-            #All other measurements using reference
+            # All other measurements using reference
             else:
                 for i in range(0, self.number_of_channels - 1):
-                    self.livePlot_plotCreation(title='Time Signals: ' + self.channelNames[i], xAxisMode="time",
-                                               yRange=[-self.args.aiRange, self.args.aiRange], colspan=1, nPlots=2, plt_idx=i)
+                    self.livePlot_plotCreation(
+                        title='Time Signals: ' + self.channelNames[i],
+                        xAxisMode="time",
+                        yRange=[-self.args.aiRange,
+                                self.args.aiRange],
+                        colspan=1, nPlots=2, plt_idx=i)
                     winGraph.nextRow()
-        #No reference channel
+        # No reference channel
         else:
             for i in range(0, self.number_of_channels):
-                self.livePlot_plotCreation(title='Time Signals: ' + self.channelNames[i], xAxisMode="time",
-                                           yRange=[-self.args.aiRange, self.args.aiRange], colspan=1, nPlots=1, plt_idx=i)
+                self.livePlot_plotCreation(
+                    title='Time Signals: ' + self.channelNames[i],
+                    xAxisMode="time",
+                    yRange=[-self.args.aiRange,
+                            self.args.aiRange],
+                    colspan=1, nPlots=1, plt_idx=i)
 
                 winGraph.nextRow()
 
         return
 
-
-
     def livePlot_2CH_Noise(self, chName=""):
         '''
-        This method preallocates the plot for the TF measurement, using noise signal,
-        2 channels one of which is reference
+        This method preallocates the plot for the TF measurement, using noise
+        signal, 2 channels one of which is reference
 
         Input: chName: The input channel name (not the reference channel).
 
         '''
-        #Time signals
-        self.livePlot_plotCreation(title="Time Signals: " + chName,
-                              xAxisMode='time',
-                              yRange=[-self.args.aiRange, self.args.aiRange],
-                              colspan=2,
-                              nPlots=2,
-                              plt_idx=0)
+        # Time signals
+        self.livePlot_plotCreation(
+            title="Time Signals: " + chName,
+            xAxisMode='time',
+            yRange=[-self.args.aiRange,
+                    self.args.aiRange],
+            colspan=2, nPlots=2, plt_idx=0)
 
         winGraph.nextRow()
 
-        #Spectrum
-        self.livePlot_plotCreation(title="Spectrum: " + chName,
-                             xAxisMode="freq",
-                             yRange=[],
-                             colspan=1,
-                             nPlots=2,
-                             plt_idx=1)
+        # Spectrum
+        self.livePlot_plotCreation(
+            title="Spectrum: " + chName,
+            xAxisMode="freq",
+            yRange=[],
+            colspan=1, nPlots=2, plt_idx=1)
 
-        #Transfer function
-        self.livePlot_plotCreation(title="Transfer function: " + chName,
-                             xAxisMode="freq",
-                             yRange=[],
-                             colspan=1,
-                             nPlots=1,
-                             plt_idx=2)
+        # Transfer function
+        self.livePlot_plotCreation(
+            title="Transfer function: " + chName,
+            xAxisMode="freq",
+            yRange=[],
+            colspan=1, nPlots=1, plt_idx=2)
 
         winGraph.nextRow()
 
-        #Impulse Responce
-        self.livePlot_plotCreation(title="Impulse Response: " + chName,
-                             xAxisMode="time",
-                             yRange=[],
-                             colspan=1,
-                             nPlots=1,
-                             plt_idx=3)
+        # Impulse Response
+        self.livePlot_plotCreation(
+            title="Impulse Response: " + chName,
+            xAxisMode="time",
+            yRange=[],
+            colspan=1, nPlots=1, plt_idx=3)
 
-
-        #Coherence
-        self.livePlot_plotCreation(title="Coherence: " + chName,
-                             xAxisMode="freq",
-                             yRange=[0, 1.1],
-                             colspan=1,
-                             nPlots=1,
-                             plt_idx=4)
-
+        # Coherence
+        self.livePlot_plotCreation(
+            title="Coherence: " + chName,
+            xAxisMode="freq",
+            yRange=[0, 1.1],
+            colspan=1, nPlots=1, plt_idx=4)
 
         return
 
-    def livePlot_plotCreation(self, title, xAxisMode="time", yRange=[], colspan=1, nPlots=1, plt_idx=0):
+    def livePlot_plotCreation(self,
+                              title,
+                              xAxisMode="time",
+                              yRange=[],
+                              colspan=1, nPlots=1, plt_idx=0):
         '''
         Creates a plot with a set number of curves in it.
 
         Inputs:
         - title: The plot title
-        - xAxisMode: sets the x axis to time or frequency and the scale to lin or log respectivelly.
+        - xAxisMode: sets the x axis to time or frequency and the scale to lin
+        or log respectively.
         The values of the axis are calculated by __init__.
         - yRange: sets the limits for the y axis
         - colspan: sets the number of columns the subplot will occupy.
         - nPlots: the number of curves created in the same plot.
-        - plt_idx: indexing for the current plot. Used in the case many subplots with different amount of curves are needed.
-        Example: If a figure with 2 subplots containing 2 curves each is needed, the method should be called 2 times.
-        First using nPlots=2 and plt_idx=0 and the second time with nPlots=2 and plt_idx=1
+        - plt_idx: indexing for the current plot. Used in the case many
+        subplots with different amount of curves are needed.
+        Example: If a figure with 2 subplots containing 2 curves each is
+        needed, the method should be called 2 times.
+        First using nPlots=2 and plt_idx=0 and the second time with nPlots=2
+        and plt_idx=1
         '''
 
-        #Setting up the x Axis
+        # Setting up the x Axis
         if xAxisMode == "time":
             xVec = self.tVec
             logMode = False
@@ -484,28 +579,39 @@ class livePlot(object):
         self.p.append(winGraph.addPlot(title=title, colspan=colspan))
         self.p[plt_idx].showGrid(True, True)
         self.p[plt_idx].setLogMode(logMode, False)
-        if yRange: self.p[plt_idx].setRange(yRange=[yRange[0], yRange[1]])
-        for i in range(0,nPlots):
+        if yRange:
+            self.p[plt_idx].setRange(yRange=[yRange[0], yRange[1]])
+        for i in range(0, nPlots):
             self.curve.append(self.p[plt_idx].plot(xVec, np.zeros(len(xVec))))
-
 
         return
 
     def livePlotUpdate(self, data):
         '''
-        The method updates the data for the plots, displaying the time signals, when the number of channels
+        The method updates the data for the plots, displaying the time signals,
+        when the number of channels
         is other than 2 and/or the signal used is not noise.
 
         Input: The vector of the current block of data.
         '''
         if self.selection == 'none':
             for i in range(0, self.number_of_channels):
-                self.curve[i].setData(self.tVec, data[i,:], pen=self.pen[i], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+                self.curve[i].setData(
+                    self.tVec, data[i, :],
+                    pen=self.pen[i], antialias=True,
+                    downsample=self.downsample, downsampleMethod='subsample')
         else:
             ii = 0
             for i in range(0, 2 * (self.number_of_channels - 1) - 1, 2):
-                self.curve[i].setData(self.tVec, data[self.selection,:], pen=self.pen[self.selection], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-                self.curve[i+1].setData(self.tVec, data[self.chidx[ii],:], pen=self.pen[self.chidx[ii]], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+                self.curve[i].setData(
+                    self.tVec, data[self.selection, :],
+                    pen=self.pen[self.selection], antialias=True,
+                    downsample=self.downsample, downsampleMethod='subsample')
+
+                self.curve[i+1].setData(
+                    self.tVec, data[self.chidx[ii], :],
+                    pen=self.pen[self.chidx[ii]], antialias=True,
+                    downsample=self.downsample, downsampleMethod='subsample')
                 ii += 1
 
         pg.QtGui.QApplication.processEvents()
@@ -514,7 +620,8 @@ class livePlot(object):
 
     def livePlotUpdate_H1(self, current, spectra, HdB, IR, gamma2):
         '''
-        The method updates the plots created for the TF estimator, using Noise signals and a reference channel.
+        The method updates the plots created for the TF estimator, using Noise
+        signals and a reference channel.
 
         Inputs:
         - current: The vector with the current block of time signals.
@@ -524,15 +631,50 @@ class livePlot(object):
         - gamma2: The coherence of the measurement.
         '''
 
-        self.curve[0].setData(self.tVec, current[self.selection,:], pen=self.pen[self.selection], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[1].setData(self.tVec, current[self.chidx[0],:], pen=self.pen[self.chidx[0]], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[2].setData(self.fftfreq, flm.amp2db(spectra[self.selection, 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[0], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[3].setData(self.fftfreq, flm.amp2db(spectra[self.chidx[0], 0:int(self.bufferSize / 2 + 1)]), pen=self.pen_colours[1], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[4].setData(self.fftfreq, HdB[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[5].setData(self.tVec, IR.real[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
-        self.curve[6].setData(self.fftfreq, gamma2[self.chidx[0], :], antialias=True, downsample=self.downsample, downsampleMethod='subsample')
+        self.curve[0].setData(
+            self.tVec,
+            current[self.selection, :],
+            pen=self.pen[self.selection], antialias=True,
+            downsample=self.downsample, downsampleMethod='subsample')
+
+        self.curve[1].setData(
+            self.tVec,
+            current[self.chidx[0], :],
+            pen=self.pen[self.chidx[0]], antialias=True,
+            downsample=self.downsample, downsampleMethod='subsample')
+
+        self.curve[2].setData(
+            self.fftfreq,
+            flm.amp2db(
+                spectra[self.selection, 0:int(self.bufferSize / 2 + 1)]
+            ),
+            pen=self.pen_colours[0], antialias=True,
+            downsample=self.downsample, downsampleMethod='subsample')
+
+        self.curve[3].setData(
+            self.fftfreq,
+            flm.amp2db(spectra[self.chidx[0], 0:int(self.bufferSize / 2 + 1)]),
+            pen=self.pen_colours[1], antialias=True,
+            downsample=self.downsample, downsampleMethod='subsample')
+
+        self.curve[4].setData(
+            self.fftfreq,
+            HdB[self.chidx[0], :],
+            antialias=True,
+            downsample=self.downsample, downsampleMethod='subsample')
+
+        self.curve[5].setData(
+            self.tVec,
+            IR.real[self.chidx[0], :],
+            antialias=True,
+            downsample=self.downsample, downsampleMethod='subsample')
+
+        self.curve[6].setData(
+            self.fftfreq,
+            gamma2[self.chidx[0], :],
+            antialias=True,
+            downsample=self.downsample, downsampleMethod='subsample')
 
         pg.QtGui.QApplication.processEvents()
 
         return
-
